@@ -1,5 +1,5 @@
 #include <NMEAGPS.h>
-
+#include "LowPower.h"
 //======================================================================
 //  Program: NMEAloc.ino
 //
@@ -102,6 +102,7 @@ static void printL( Print & outs, int32_t degE7 )
   outs.print( degE7 );
 }
 
+bool foundSignal = false;
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
 {
@@ -114,7 +115,8 @@ static void doSomeWork( const gps_fix & fix )
   //     the next set of GPS data.
 
   if (fix.valid.location && fix.satellites > 5) {
-
+    DEBUG_PORT.println("found a signal");
+    foundSignal = true;
     DEBUG_PORT.print("20");
     DEBUG_PORT.print(fix.dateTime.year);
     DEBUG_PORT.print("/");
@@ -159,6 +161,7 @@ static void doSomeWork( const gps_fix & fix )
 static void GPSloop();
 static void GPSloop()
 {
+
   while (gps.available( gpsPort ))
     doSomeWork( gps.read() );
 
@@ -192,5 +195,30 @@ void setup()
 
 void loop()
 {
-  GPSloop();
+  //GPSloop();
+    while (gps.available( gpsPort )){
+      while(foundSignal == false && gps.available( gpsPort )){
+          DEBUG_PORT.println( F("Trying:") );
+        doSomeWork( gps.read() );
+      }
+      DEBUG_PORT.print(foundSignal);
+      DEBUG_PORT.print(gps.available( gpsPort ));
+      foundSignal = false; // reset until the next power on
+      int powerDownPeriod = 16;
+      DEBUG_PORT.flush();
+      DEBUG_PORT.end();
+      gpsPort.end();
+      while(powerDownPeriod > 0){
+        //delay(8000);
+        LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
+        powerDownPeriod -= 8;
+      }
+        DEBUG_PORT.begin(9600);
+        while (!DEBUG_PORT)
+        ;
+        gpsPort.begin(9600);
+    }
+    // 
+    //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, 
+    //            SPI_OFF, USART0_OFF, TWI_OFF);
 }
