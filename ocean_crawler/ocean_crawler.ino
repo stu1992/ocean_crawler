@@ -169,8 +169,11 @@ static void GPSloop()
   
 //--------------------------
 
+const int GPS_POWER = 8;
 void setup()
 {
+  pinMode(GPS_POWER, OUTPUT);
+  digitalWrite(GPS_POWER, HIGH);
   DEBUG_PORT.begin(9600);
   while (!DEBUG_PORT)
     ;
@@ -204,19 +207,23 @@ void loop()
       DEBUG_PORT.print(foundSignal);
       DEBUG_PORT.print(gps.available( gpsPort ));
       foundSignal = false; // reset until the next power on
-      int powerDownPeriod = 16;
+      int powerDownPeriod = 2;
       DEBUG_PORT.flush();
       DEBUG_PORT.end();
       gpsPort.end();
+      digitalWrite(GPS_POWER, LOW);
       while(powerDownPeriod > 0){
-        //delay(8000);
-        LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
+        delay(1000);
+        //LowPower.idle(SLEEP_1S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
         powerDownPeriod -= 8;
       }
+        digitalWrite(GPS_POWER, HIGH);
+
         DEBUG_PORT.begin(9600);
         while (!DEBUG_PORT)
         ;
         gpsPort.begin(9600);
+        delay(5000);
     }
     // 
     //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, 
