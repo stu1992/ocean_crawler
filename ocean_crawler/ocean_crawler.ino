@@ -102,7 +102,7 @@ static void printL( Print & outs, int32_t degE7 )
   // Print fractional degrees
   outs.print( degE7 );
 }
-const int WATCHDOG_RESET = 20;
+const int WATCHDOG_RESET = 60;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
 static void doSomeWork( const gps_fix & fix );
@@ -202,16 +202,12 @@ void setup()
 void loop()
 {
   //GPSloop();
-  if( watchdog == 0){
-    DEBUG_PORT.print( F("Resetting chip from Watchdog count ") );
-    wdt_enable(WDTO_15MS);
-  }
     while (gps.available( gpsPort )){
       while(foundSignal == false && gps.available( gpsPort )){
         doSomeWork( gps.read() );
       }
       int powerDownPeriod = 600;
-      if(foundSignal){
+      if(foundSignal || watchdog <= 0){
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
         gpsPort.end();
