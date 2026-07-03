@@ -1,0 +1,6 @@
+@ocean_crawler_backend_HostAddress = http://localhost:5167
+
+GET {{ocean_crawler_backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
