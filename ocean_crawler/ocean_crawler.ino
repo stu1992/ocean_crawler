@@ -1,5 +1,6 @@
 #include <NMEAGPS.h>
 #include "LowPower.h"
+#include <avr/wdt.h>
 //======================================================================
 //  Program: NMEAloc.ino
 //
@@ -101,7 +102,8 @@ static void printL( Print & outs, int32_t degE7 )
   // Print fractional degrees
   outs.print( degE7 );
 }
-
+const int WATCHDOG_RESET = 20;
+int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
@@ -117,6 +119,7 @@ static void doSomeWork( const gps_fix & fix )
   if (fix.valid.location && fix.satellites > 5) {
     DEBUG_PORT.println("found a signal");
     foundSignal = true;
+    watchdog = WATCHDOG_RESET;
     DEBUG_PORT.print("20");
     DEBUG_PORT.print(fix.dateTime.year);
     DEBUG_PORT.print("/");
@@ -149,7 +152,7 @@ static void doSomeWork( const gps_fix & fix )
     
   } else {
     // No valid location data yet!
-    DEBUG_PORT.print( '?' );
+    DEBUG_PORT.print( "GPS available but no lock found" );
   }
 
   DEBUG_PORT.println();
@@ -199,33 +202,37 @@ void setup()
 void loop()
 {
   //GPSloop();
+  if( watchdog == 0){
+    DEBUG_PORT.print( F("Resetting chip from Watchdog count ") );
+    wdt_enable(WDTO_15MS);
+  }
     while (gps.available( gpsPort )){
       while(foundSignal == false && gps.available( gpsPort )){
-          DEBUG_PORT.println( F("Trying:") );
         doSomeWork( gps.read() );
       }
-      DEBUG_PORT.print(foundSignal);
-      DEBUG_PORT.print(gps.available( gpsPort ));
-      foundSignal = false; // reset until the next power on
-      int powerDownPeriod = 2;
-      DEBUG_PORT.flush();
-      DEBUG_PORT.end();
-      gpsPort.end();
-      digitalWrite(GPS_POWER, LOW);
-      while(powerDownPeriod > 0){
-        delay(1000);
-        //LowPower.idle(SLEEP_1S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
-        powerDownPeriod -= 8;
+      int powerDownPeriod = 600;
+      if(foundSignal){
+        DEBUG_PORT.flush();
+        DEBUG_PORT.end();
+        gpsPort.end();
+        digitalWrite(GPS_POWER, LOW);
+        while(powerDownPeriod > 0){
+          LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
+          powerDownPeriod -= 8;
+        }
+          digitalWrite(GPS_POWER, HIGH);
+          delay(1000);
+          DEBUG_PORT.begin(9600);
+          while (!DEBUG_PORT)
+          delay(1000);
+          gpsPort.begin(9600);
+          delay(1000);
+      }else{
+        watchdog --;
+        DEBUG_PORT.print( F("Watchdog: ") );
+        DEBUG_PORT.println(watchdog);
       }
-        digitalWrite(GPS_POWER, HIGH);
-
-        DEBUG_PORT.begin(9600);
-        while (!DEBUG_PORT)
-        ;
-        gpsPort.begin(9600);
-        delay(5000);
+      foundSignal = false; // reset until the next power on
     }
-    // 
-    //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, 
-    //            SPI_OFF, USART0_OFF, TWI_OFF);
+
 }
