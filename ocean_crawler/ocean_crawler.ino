@@ -1,39 +1,6 @@
 #include <NMEAGPS.h>
 #include "LowPower.h"
 #include <avr/wdt.h>
-//======================================================================
-//  Program: NMEAloc.ino
-//
-//  Description:  This program only parses an RMC sentence for the lat/lon.
-//
-//  Prerequisites:
-//     1) NMEA.ino works with your device (correct TX/RX pins and baud rate)
-//     2) The RMC sentence has been enabled.
-//     3) Your device sends an RMC sentence (e.g., $GPRMC).
-//
-//  'Serial' is for debug output to the Serial Monitor window.
-//
-//  License:
-//    Copyright (C) 2014-2017, SlashDevin
-//
-//    This file is part of NeoGPS
-//
-//    NeoGPS is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 3 of the License, or
-//    (at your option) any later version.
-//
-//    NeoGPS is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with NeoGPS.  If not, see <http://www.gnu.org/licenses/>.
-//
-//======================================================================
-
-
 
 // pull out serial pins for upload
 // tx UNO pin 1 goes to rx gps pin
@@ -115,9 +82,7 @@ static void doSomeWork( const gps_fix & fix )
   //  For this example, we just print the lat/lon.  If you print too much,
   //     this routine will not get back to "loop()" in time to process
   //     the next set of GPS data.
-
-  if (fix.valid.location && fix.satellites > 5) {
-    DEBUG_PORT.println("found a signal");
+  if (fix.valid.location) { // && fix.satellites > 5
     foundSignal = true;
     watchdog = WATCHDOG_RESET;
     DEBUG_PORT.print("20");
@@ -142,17 +107,27 @@ static void doSomeWork( const gps_fix & fix )
     DEBUG_PORT.print(fix.dateTime.seconds);
     DEBUG_PORT.print(" -> ");
 
-    // DEBUG_PORT.print( fix.latitude(), 6 ); // floating-point display
-    // DEBUG_PORT.print( fix.latitudeL() ); // integer display
     printL( DEBUG_PORT, fix.latitudeL() ); // prints int like a float
     DEBUG_PORT.print( ',' );
-    // DEBUG_PORT.print( fix.longitude(), 6 ); // floating-point display
-    // DEBUG_PORT.print( fix.longitudeL() );  // integer display
     printL( DEBUG_PORT, fix.longitudeL() ); // prints int like a float
     
+    // // create payload for post
+    uint32_t timestamp = (NeoGPS::clock_t) fix.dateTime + 946684800UL;
+    DEBUG_PORT.println("");
+    DEBUG_PORT.print("[{\"timestamp\" : ");
+    DEBUG_PORT.print(timestamp);
+    DEBUG_PORT.print(", \"latitude\" : ");
+    printL( DEBUG_PORT, fix.latitudeL() );
+    DEBUG_PORT.print(", \"longitude\" : ");
+    printL( DEBUG_PORT, fix.longitudeL() );
+    DEBUG_PORT.println("}]");
+  
+
   } else {
     // No valid location data yet!
-    DEBUG_PORT.print( "GPS available but no lock found" );
+    DEBUG_PORT.print( "No lock, found " );
+    DEBUG_PORT.print(fix.satellites);
+    DEBUG_PORT.print( " satellites" );
   }
 
   DEBUG_PORT.println();
@@ -217,16 +192,16 @@ void loop()
           powerDownPeriod -= 8;
         }
           digitalWrite(GPS_POWER, HIGH);
-          delay(1000);
+          delay(2000);
           DEBUG_PORT.begin(9600);
           while (!DEBUG_PORT)
-          delay(1000);
+          delay(2000);
           gpsPort.begin(9600);
-          delay(1000);
+          delay(2000);
       }else{
         watchdog --;
-        DEBUG_PORT.print( F("Watchdog: ") );
-        DEBUG_PORT.println(watchdog);
+        //DEBUG_PORT.print( F("Watchdog: ") );
+        //DEBUG_PORT.println(watchdog);
       }
       foundSignal = false; // reset until the next power on
     }
