@@ -33,44 +33,37 @@ foreach (var data in ideas)
     }
     result.currentLatitude = ideas?.Last().Latitude ?? 0.0;
     result.currentLongitude = ideas?.Last().Longitude ?? 0.0;
-
-    //result.GpsHistory.Add(new GpsData(1700, -37.8905752, 147.9744201));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8931751, 147.977006));
-    //result.GpsHistory.Add(new GpsData(1700, -37.895287, 147.9830989));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8960082, 147.9887009));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8959847, 147.9970343));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8979804, 148.0035925));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8968936, 148.0155115));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8965289,148.0191522));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8952437,148.0229046));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8942408,148.0273223));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8944553,148.0344886));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8943674,148.0393696));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8959815,148.0498477));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8979239,148.0600221));
-    //result.GpsHistory.Add(new GpsData(1700, -37.9001827,148.0715247));
-    //result.GpsHistory.Add(new GpsData(1700, -37.9015747,148.0918328));
-    //result.GpsHistory.Add(new GpsData(1700, -37.8962271,148.1317267));
-
-
     var jsonString = JsonConvert.SerializeObject(result);
     return jsonString;
 })
 .WithName("locationHistory");
 
+app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
+{
+    //TODO authenticate via uuid to get CrawlerId
+    foreach( var point in locations)
+    {
+        var entity = new GpsHistoryEntity
+        {
+            CrawlerId = 1,
+            Timestamp = point.timestamp,
+            Longitude = point.longitude,
+            Latitude = point.latitude
+        };
+
+        context.gps_history.Add(entity);
+
+    }
+        context.SaveChangesAsync();
+
+})
+.WithName("addHistory");
+
 app.Run();
 
-class GpsData {
-    public long timestamp;
-    public double latitude;
-    public double longitude;
-    public GpsData(long timestamp, double longitude, double latitude)
-    {
-        this.timestamp = timestamp;
-        this.latitude = latitude;
-        this.longitude = longitude;
-    }
-}
+public record HistoryDto(string uuid, List<GpsData> locations);
+
+public record GpsData(long timestamp, double longitude, double latitude);
 class LocationInfo()
 {
     public double currentLatitude;
