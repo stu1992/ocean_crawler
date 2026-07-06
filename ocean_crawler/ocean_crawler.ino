@@ -183,6 +183,7 @@ void loop()
       }
       int powerDownPeriod = 600;
       if(foundSignal || watchdog <= 0){
+        DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
         gpsPort.end();
@@ -198,6 +199,8 @@ void loop()
           delay(2000);
           gpsPort.begin(9600);
           delay(2000);
+          DEBUG_PORT.println( "Waking up" );
+          watchdog = WATCHDOG_RESET;
       }else{
         watchdog --;
         //DEBUG_PORT.print( F("Watchdog: ") );
