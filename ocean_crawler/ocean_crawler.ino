@@ -69,9 +69,48 @@ static void printL( Print & outs, int32_t degE7 )
   // Print fractional degrees
   outs.print( degE7 );
 }
+// system globals
 const int WATCHDOG_RESET = 60;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
+const int POWER_DOWN_PERIOD = 2*60;
+const int DIAGNOSTIC_PERIOD = 5*60*1000;
+const int GPS_POWER = 8;
+unsigned long lastDiagnosticMessage = 0;
+
+// diagnostics
+
+// retries
+unsigned int tries = 0;
+unsigned int successfulLocks = 0;
+float averageTryCount = 0;
+
+// satelites
+unsigned int attempts = 0;
+unsigned int totalSatellites = 0;
+float averageSatelliteCount = 0;
+
+// wakups
+unsigned int wakeups = 0;
+unsigned int locks = 0;
+float averageWakeupPerLock = 0;
+
+void diagnostics()
+{
+  averageTryCount = successfulLocks / tries;
+  averageSatelliteCount = totalSatellites / attempts;
+  averageWakeupPerLock = wakeups / locks;
+    DEBUG_PORT.println(attempts);
+    DEBUG_PORT.println(totalSatellites);
+    DEBUG_PORT.print("{\"diagnostics\" : {");
+    DEBUG_PORT.print("\"averageTryCount\" : ");
+    DEBUG_PORT.print(averageTryCount);
+    DEBUG_PORT.print(", \"averageSatelliteCount\" : ");
+    DEBUG_PORT.print(averageSatelliteCount);
+    DEBUG_PORT.print(", \"averageWakeupPerLock\" : ");
+    DEBUG_PORT.print(averageWakeupPerLock);
+    DEBUG_PORT.println("}}");
+}
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
 {
@@ -85,51 +124,54 @@ static void doSomeWork( const gps_fix & fix )
   if (fix.valid.location) { // && fix.satellites > 5
     foundSignal = true;
     watchdog = WATCHDOG_RESET;
-    DEBUG_PORT.print("20");
-    DEBUG_PORT.print(fix.dateTime.year);
-    DEBUG_PORT.print("/");
-    if ( fix.dateTime.month < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.month);
-    DEBUG_PORT.print("/");
-    if ( fix.dateTime.date < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.date);
-    DEBUG_PORT.print(" : ");
-    DEBUG_PORT.print(fix.dateTime.hours);
-    DEBUG_PORT.print(":");
-    if ( fix.dateTime.minutes < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.minutes);
-    DEBUG_PORT.print(":");
-    if ( fix.dateTime.seconds < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.seconds);
-    DEBUG_PORT.print(" -> ");
+    // DEBUG_PORT.print("20");
+    // DEBUG_PORT.print(fix.dateTime.year);
+    // DEBUG_PORT.print("/");
+    // if ( fix.dateTime.month < 10 )
+    //   DEBUG_PORT.print( '0' );
+    // DEBUG_PORT.print(fix.dateTime.month);
+    // DEBUG_PORT.print("/");
+    // if ( fix.dateTime.date < 10 )
+    //   DEBUG_PORT.print( '0' );
+    // DEBUG_PORT.print(fix.dateTime.date);
+    // DEBUG_PORT.print(" : ");
+    // DEBUG_PORT.print(fix.dateTime.hours);
+    // DEBUG_PORT.print(":");
+    // if ( fix.dateTime.minutes < 10 )
+    //   DEBUG_PORT.print( '0' );
+    // DEBUG_PORT.print(fix.dateTime.minutes);
+    // DEBUG_PORT.print(":");
+    // if ( fix.dateTime.seconds < 10 )
+    //   DEBUG_PORT.print( '0' );
+    // DEBUG_PORT.print(fix.dateTime.seconds);
+    // DEBUG_PORT.print(" -> ");
 
-    printL( DEBUG_PORT, fix.latitudeL() ); // prints int like a float
-    DEBUG_PORT.print( ',' );
-    printL( DEBUG_PORT, fix.longitudeL() ); // prints int like a float
+    // printL( DEBUG_PORT, fix.latitudeL() ); // prints int like a float
+    // DEBUG_PORT.print( ',' );
+    // printL( DEBUG_PORT, fix.longitudeL() ); // prints int like a float
     
     // // create payload for post
     uint32_t timestamp = (NeoGPS::clock_t) fix.dateTime + 946684800UL;
     DEBUG_PORT.println("");
-    DEBUG_PORT.print("[{\"timestamp\" : ");
+    DEBUG_PORT.print("{\"readings\" : [{\"timestamp\" : ");
     DEBUG_PORT.print(timestamp);
     DEBUG_PORT.print(", \"latitude\" : ");
     printL( DEBUG_PORT, fix.latitudeL() );
     DEBUG_PORT.print(", \"longitude\" : ");
     printL( DEBUG_PORT, fix.longitudeL() );
-    DEBUG_PORT.println("}]");
-  
+    DEBUG_PORT.println("}]}");
+    
+    // set internal clock for interrupts
 
+  
+    successfulLocks++; //diagnostics
+    locks++; //diagnostics
   } else {
     // No valid location data yet!
-    DEBUG_PORT.print( "No lock, found " );
     DEBUG_PORT.print(fix.satellites);
     DEBUG_PORT.print( " satellites" );
   }
-
+  totalSatellites += fix.satellites; // diagnostics
   DEBUG_PORT.println();
 
 } // doSomeWork
@@ -147,7 +189,7 @@ static void GPSloop()
   
 //--------------------------
 
-const int GPS_POWER = 8;
+
 void setup()
 {
   pinMode(GPS_POWER, OUTPUT);
@@ -180,8 +222,10 @@ void loop()
     while (gps.available( gpsPort )){
       while(foundSignal == false && gps.available( gpsPort )){
         doSomeWork( gps.read() );
+        tries++; //diagnostics
+        attempts++; //diagnostics
       }
-      int powerDownPeriod = 600;
+      int powerDownPeriod = POWER_DOWN_PERIOD;
       if(foundSignal || watchdog <= 0){
         DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
@@ -200,7 +244,16 @@ void loop()
           gpsPort.begin(9600);
           delay(2000);
           DEBUG_PORT.println( "Waking up" );
+          diagnostics();
+          DEBUG_PORT.println(millis());
+          DEBUG_PORT.println(lastDiagnosticMessage);
+          DEBUG_PORT.println(DIAGNOSTIC_PERIOD);
+          if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD){
+            diagnostics();
+            lastDiagnosticMessage = millis();
+          }
           watchdog = WATCHDOG_RESET;
+          wakeups++; //diagnostics
       }else{
         watchdog --;
         //DEBUG_PORT.print( F("Watchdog: ") );
