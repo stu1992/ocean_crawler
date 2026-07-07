@@ -28,12 +28,19 @@ try:
             decoded_string = raw_data.decode('utf-8').strip()
             
             print(decoded_string)
-            if decoded_string[:1] == "[":
+            if decoded_string[2:10] == "readings":
                 print("found a reading")
-                print(decoded_string)
-                #payload = [{"timestamp": 1700, "longitude": 0.0, "latitude" : 0.0}]
-                response = requests.post(url, json=json.loads(decoded_string))
+                payload = json.loads(decoded_string)
+                print(payload['readings'])
+                response = requests.post(url, json=payload['readings'])
                 print(response.status_code)
+            elif decoded_string[2:13] == "diagnostics":
+                print("found a reading")
+                payload = json.loads(decoded_string)
+                print(payload['diagnostics'])
+                #todo create an endpoint to persist diagnostic information
+                #response = requests.post(url, json=payload['diagnostics'])
+                #print(response.status_code)
 
 
             
