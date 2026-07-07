@@ -1,6 +1,8 @@
 #include <NMEAGPS.h>
 #include "LowPower.h"
 #include <avr/wdt.h>
+#include <SSD1306.h>
+#include <Wire.h>
 
 // pull out serial pins for upload
 // tx UNO pin 1 goes to rx gps pin
@@ -70,11 +72,12 @@ static void printL( Print & outs, int32_t degE7 )
   outs.print( degE7 );
 }
 // system globals
+SSD1306 display;
 const int WATCHDOG_RESET = 60;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const int POWER_DOWN_PERIOD = 2*60;
-const int DIAGNOSTIC_PERIOD = 5*60*1000;
+const unsigned long POWER_DOWN_PERIOD = 600;
+const unsigned long DIAGNOSTIC_PERIOD = 300000;
 const int GPS_POWER = 8;
 unsigned long lastDiagnosticMessage = 0;
 
@@ -97,11 +100,15 @@ float averageWakeupPerLock = 0;
 
 void diagnostics()
 {
-  averageTryCount = successfulLocks / tries;
-  averageSatelliteCount = totalSatellites / attempts;
-  averageWakeupPerLock = wakeups / locks;
+  averageTryCount =  (float)tries / (float)successfulLocks;
+  averageSatelliteCount = (float)totalSatellites / (float)attempts;
+  averageWakeupPerLock = (float)wakeups / (float)locks;
+    DEBUG_PORT.println(tries);
+    DEBUG_PORT.println(successfulLocks);
     DEBUG_PORT.println(attempts);
     DEBUG_PORT.println(totalSatellites);
+    DEBUG_PORT.println(wakeups);
+    DEBUG_PORT.println(locks);
     DEBUG_PORT.print("{\"diagnostics\" : {");
     DEBUG_PORT.print("\"averageTryCount\" : ");
     DEBUG_PORT.print(averageTryCount);
@@ -110,6 +117,19 @@ void diagnostics()
     DEBUG_PORT.print(", \"averageWakeupPerLock\" : ");
     DEBUG_PORT.print(averageWakeupPerLock);
     DEBUG_PORT.println("}}");
+
+  display.clear();
+  display.setCaret(0, 0);
+  display.print("{\"diagnostics\" : {");
+  display.print("\"averageTryCount\" : ");
+  display.print(averageTryCount);
+  display.print(", \"averageSatelliteCount\" : ");
+  display.print(averageSatelliteCount);
+  display.print(", \"averageWakeupPerLock\" : ");
+  display.print(averageWakeupPerLock);
+  display.print("}}");
+  display.update();
+  
 }
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
@@ -160,9 +180,17 @@ static void doSomeWork( const gps_fix & fix )
     DEBUG_PORT.print(", \"longitude\" : ");
     printL( DEBUG_PORT, fix.longitudeL() );
     DEBUG_PORT.println("}]}");
-    
-    // set internal clock for interrupts
 
+  display.clear();
+  display.setCaret(0, 0);
+  display.print("{\"readings\" : [{\"timestamp\" : ");
+  display.print((int)timestamp);
+  display.print(", \"latitude\" : ");
+  display.print(fix.latitude(), 8);
+  display.print(", \"longitude\" : ");
+  display.print(fix.longitude(),8 );
+  display.print("}]}");
+  display.update();
   
     successfulLocks++; //diagnostics
     locks++; //diagnostics
@@ -212,6 +240,29 @@ void setup()
   DEBUG_PORT.flush();
 
   gpsPort.begin(9600);
+
+
+  // display
+   Wire.begin();
+
+  display.init();
+  display.clear();
+
+  display.print('!');
+  display.print(F("\"#$%&'()*+,-./"));
+  display.setCaret(10, 10);
+  display.setScale(2);
+  display.print(F("0123456789"));
+  display.setCaret(40, 28);
+  display.setScale(1);
+  display.print(F(":;<=>?@"));
+  display.setCaret(0, 40);
+  display.print(F("ABCDEFGHIJKLMNOPQRSTUVWXYZ"));
+  display.print(F("[\\]^_`"));
+  display.print(F("abcdefghijklmnopqrstuvwxyz"));
+  display.print(F("{|}~"));
+
+  display.update();
 }
 
 //--------------------------
@@ -244,7 +295,7 @@ void loop()
           gpsPort.begin(9600);
           delay(2000);
           DEBUG_PORT.println( "Waking up" );
-          diagnostics();
+          //diagnostics();
           DEBUG_PORT.println(millis());
           DEBUG_PORT.println(lastDiagnosticMessage);
           DEBUG_PORT.println(DIAGNOSTIC_PERIOD);
