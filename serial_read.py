@@ -4,7 +4,8 @@ import requests
 import time
 import json
 
-url = "http://localhost:5167/addHistory"
+location_url = "http://localhost:5167/addHistory"
+diagnostic_url = "http://localhost:5167/addDiagnostics"
 # 1. Configure the serial port and baud rate
 # 'timeout=1' prevents the script from hanging forever if no data arrives
 PORT = 'COM3' 
@@ -32,15 +33,15 @@ try:
                 print("found a reading")
                 payload = json.loads(decoded_string)
                 print(payload['readings'])
-                response = requests.post(url, json=payload['readings'])
+                response = requests.post(location_url, json=payload['readings'])
                 print(response.status_code)
             elif decoded_string[2:13] == "diagnostics":
                 print("found a reading")
                 payload = json.loads(decoded_string)
+                payload['diagnostics']['timestamp'] = int(time.time())
                 print(payload['diagnostics'])
-                #todo create an endpoint to persist diagnostic information
-                #response = requests.post(url, json=payload['diagnostics'])
-                #print(response.status_code)
+                response = requests.post(diagnostic_url, json=payload['diagnostics'])
+                print(response.status_code)
 
 
             

@@ -9,6 +9,8 @@ var connectionString =
    builder.Configuration.GetValue<string>("DatabaseConnection");
 builder.Services.AddDbContext<GpsContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<DiagnosticsContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddOpenApi();
 
@@ -59,6 +61,23 @@ app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
 })
 .WithName("addHistory");
 
+app.MapPost("/addDiagnostics", (DiagnosticsDto diagnostics, DiagnosticsContext context) =>
+{
+    //TODO authenticate via uuid to get CrawlerId
+    var entity = new DiagnosticsHistoryEntity
+    {
+        CrawlerId = 1,
+        Timestamp = diagnostics.timestamp,
+        averageSatelliteCount = diagnostics.averageSatelliteCount,
+        averageTryCount = diagnostics.averageTryCount,
+        averageWakeupPerLock = diagnostics.averageWakeupPerLock
+    };
+
+    context.diagnostics_history.Add(entity);
+    context.SaveChangesAsync();
+})
+.WithName("addDiagnostics");
+
 app.Run();
 
 public record HistoryDto(string uuid, List<GpsData> locations);
@@ -71,3 +90,5 @@ class LocationInfo()
     public List<GpsData> GpsHistory = new List<GpsData>();
 
 }
+
+public record DiagnosticsDto(long timestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock);
