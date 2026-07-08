@@ -116,6 +116,8 @@ void diagnostics()
     DEBUG_PORT.print(averageSatelliteCount);
     DEBUG_PORT.print(", \"averageWakeupPerLock\" : ");
     DEBUG_PORT.print(averageWakeupPerLock);
+    DEBUG_PORT.print(", \"uptime\" : ");
+    DEBUG_PORT.print(millis());
     DEBUG_PORT.println("}}");
 
   display.clear();
@@ -144,31 +146,6 @@ static void doSomeWork( const gps_fix & fix )
   if (fix.valid.location) { // && fix.satellites > 5
     foundSignal = true;
     watchdog = WATCHDOG_RESET;
-    // DEBUG_PORT.print("20");
-    // DEBUG_PORT.print(fix.dateTime.year);
-    // DEBUG_PORT.print("/");
-    // if ( fix.dateTime.month < 10 )
-    //   DEBUG_PORT.print( '0' );
-    // DEBUG_PORT.print(fix.dateTime.month);
-    // DEBUG_PORT.print("/");
-    // if ( fix.dateTime.date < 10 )
-    //   DEBUG_PORT.print( '0' );
-    // DEBUG_PORT.print(fix.dateTime.date);
-    // DEBUG_PORT.print(" : ");
-    // DEBUG_PORT.print(fix.dateTime.hours);
-    // DEBUG_PORT.print(":");
-    // if ( fix.dateTime.minutes < 10 )
-    //   DEBUG_PORT.print( '0' );
-    // DEBUG_PORT.print(fix.dateTime.minutes);
-    // DEBUG_PORT.print(":");
-    // if ( fix.dateTime.seconds < 10 )
-    //   DEBUG_PORT.print( '0' );
-    // DEBUG_PORT.print(fix.dateTime.seconds);
-    // DEBUG_PORT.print(" -> ");
-
-    // printL( DEBUG_PORT, fix.latitudeL() ); // prints int like a float
-    // DEBUG_PORT.print( ',' );
-    // printL( DEBUG_PORT, fix.longitudeL() ); // prints int like a float
     
     // // create payload for post
     uint32_t timestamp = (NeoGPS::clock_t) fix.dateTime + 946684800UL;
@@ -181,10 +158,13 @@ static void doSomeWork( const gps_fix & fix )
     printL( DEBUG_PORT, fix.longitudeL() );
     DEBUG_PORT.println("}]}");
 
+  char buf[16]; 
+// assign lval something then...
+  ltoa(timestamp,buf,10);
   display.clear();
   display.setCaret(0, 0);
   display.print("{\"readings\" : [{\"timestamp\" : ");
-  display.print((int)timestamp);
+  display.print(buf);
   display.print(", \"latitude\" : ");
   display.print(fix.latitude(), 8);
   display.print(", \"longitude\" : ");
