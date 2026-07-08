@@ -16,6 +16,9 @@ public class DiagnosticsHistoryEntity
     [Column("crawler_id")]
     public int CrawlerId { get; set; }
 
+    [Column("uptime")]
+    public long Uptime { get; set; }
+
     [Column("average_try_count")]
     public double averageTryCount { get; set; }
 

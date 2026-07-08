@@ -70,7 +70,8 @@ app.MapPost("/addDiagnostics", (DiagnosticsDto diagnostics, DiagnosticsContext c
         Timestamp = diagnostics.timestamp,
         averageSatelliteCount = diagnostics.averageSatelliteCount,
         averageTryCount = diagnostics.averageTryCount,
-        averageWakeupPerLock = diagnostics.averageWakeupPerLock
+        averageWakeupPerLock = diagnostics.averageWakeupPerLock,
+        Uptime = diagnostics.uptime,
     };
 
     context.diagnostics_history.Add(entity);
@@ -91,4 +92,4 @@ class LocationInfo()
 
 }
 
-public record DiagnosticsDto(long timestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock);
+public record DiagnosticsDto(long timestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock, long uptime);
