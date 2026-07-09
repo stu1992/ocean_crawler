@@ -8,7 +8,7 @@ function App() {
 
     useEffect(() => {
       const startFetching = async () => {
-      const response = await fetch(`http://localhost:5000/locationHistory`);
+      const response = await fetch(`http://localhost:80/api/locationHistory`);
       const json = await response.json();
       setgpsData(json);
     }
@@ -16,9 +16,13 @@ function App() {
   }, []);
 
   return (
+        <>
+    <h1>Ocean Crawler</h1>
+
     <div className="App">
       {gpsData !== undefined && gpsData !== null && <Map gpsData={gpsData}/> }
     </div>
+    </>
   );
 }
 

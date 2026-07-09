@@ -17,9 +17,9 @@ const chunkArray = (arr, size) => {
 let chunks = chunkArray(multiPolyline[0], 2);
 chunks.shift();
 return(
-  <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={13} scrollWheelZoom={true}>
+  <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={13} scrollWheelZoom={true} tap={false}>
     <TileLayer
-      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
     />
     {

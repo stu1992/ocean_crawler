@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    container_name: react_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-service
+    networks:
+      - app-network
+
+  backend-service:
+    image: node:20-alpine # Or your specific backend API image/build path
+    container_name: api_backend
+    # command: npm run start (example)
+    expose:
+      - "5000"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
