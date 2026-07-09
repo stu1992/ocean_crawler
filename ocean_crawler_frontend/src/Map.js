@@ -1,10 +1,10 @@
 import React from 'react';
-import { MapContainer, TileLayer, useMap, Marker, Polyline, CircleMarker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet'
 export function Map({gpsData}) {
 
 let multiPolyline = [[]] 
 multiPolyline[0]=gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]);
-var lastKnownTimestamp = new Date(gpsData['GpsHistory'][0]['timestamp'] * 1000);
+let lastKnownTimestamp = new Date(gpsData['GpsHistory'][0]['timestamp'] * 1000);
 
 const chunkArray = (arr, size) => {
   return arr.reduce((acc, _, i) => {
