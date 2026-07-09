@@ -8,7 +8,8 @@ RUN npm install
 RUN npm ci
 
 # Copy source files and build the app
-COPY ./ocean_crawler_frontend/ .
+COPY ./ocean_crawler_frontend/public/ ./public/
+COPY ./ocean_crawler_frontend/src/ ./src/
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx

@@ -8,7 +8,7 @@ function App() {
 
     useEffect(() => {
       const startFetching = async () => {
-      const response = await fetch(`http://localhost:80/api/locationHistory`);
+      const response = await fetch(`/api/locationHistory`);
       const json = await response.json();
       setgpsData(json);
     }
