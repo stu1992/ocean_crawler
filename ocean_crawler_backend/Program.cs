@@ -26,11 +26,10 @@ app.MapGet("/locationHistory", (GpsContext context) =>
 {
     var result = new LocationInfo();
     var ideas = context.gps_history
-            .OrderBy(b => b.Timestamp)
-            .Take(100);
+        .OrderByDescending(b => b.Timestamp)
+        .Take(200);
     ideas.ToList();
-foreach (var data in ideas)
-    {
+    foreach (var data in ideas){
         result.GpsHistory.Add(new GpsData(data.Timestamp, data.Latitude, data.Longitude));
     }
     result.currentLatitude = ideas?.Last().Latitude ?? 0.0;
@@ -43,8 +42,7 @@ foreach (var data in ideas)
 app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
 {
     //TODO authenticate via uuid to get CrawlerId
-    foreach( var point in locations)
-    {
+    foreach( var point in locations){
         var entity = new GpsHistoryEntity
         {
             CrawlerId = 1,
@@ -52,7 +50,6 @@ app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
             Longitude = point.longitude,
             Latitude = point.latitude
         };
-
         context.gps_history.Add(entity);
         context.SaveChanges();
     }
@@ -72,7 +69,6 @@ app.MapPost("/addDiagnostics", (DiagnosticsDto diagnostics, DiagnosticsContext c
         averageWakeupPerLock = diagnostics.averageWakeupPerLock,
         Uptime = diagnostics.uptime
     };
-
     context.diagnostics_history.Add(entity);
     context.SaveChanges();
 })
