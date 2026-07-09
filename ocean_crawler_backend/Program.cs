@@ -54,9 +54,8 @@ app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
         };
 
         context.gps_history.Add(entity);
-
+        context.SaveChanges();
     }
-        context.SaveChangesAsync();
 
 })
 .WithName("addHistory");
@@ -71,11 +70,11 @@ app.MapPost("/addDiagnostics", (DiagnosticsDto diagnostics, DiagnosticsContext c
         averageSatelliteCount = diagnostics.averageSatelliteCount,
         averageTryCount = diagnostics.averageTryCount,
         averageWakeupPerLock = diagnostics.averageWakeupPerLock,
-        Uptime = diagnostics.uptime,
+        Uptime = diagnostics.uptime
     };
 
     context.diagnostics_history.Add(entity);
-    context.SaveChangesAsync();
+    context.SaveChanges();
 })
 .WithName("addDiagnostics");
 
