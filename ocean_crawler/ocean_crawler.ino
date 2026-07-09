@@ -1,8 +1,6 @@
 #include <NMEAGPS.h>
 #include "LowPower.h"
 #include <avr/wdt.h>
-//  #include <SSD1306.h>
-//  #include <Wire.h>
 #include <SPI.h>
 #include <SD.h>
 #include <Ethernet.h>
@@ -11,6 +9,8 @@
 // pull out serial pins for upload
 // tx UNO pin 1 goes to rx gps pin
 // rx UNO pin 0 goes to tx gps pin
+
+// 3.3v to pin 7 if you want to hold off writing locations to serial until you're connected home
 // 9600 baud rate for serial
 #include <GPSport.h>
 
@@ -114,6 +114,7 @@ const unsigned long POWER_DOWN_PERIOD = 600;
 const unsigned long DIAGNOSTIC_PERIOD = 500000;
 const int GPS_POWER = 8;
 const int SdchipSelect = 4;
+const int DONT_CLEAR_BUFFER = 7;
 unsigned long lastDiagnosticMessage = 0;
 
 // diagnostics
@@ -222,19 +223,6 @@ void diagnostics()
     DEBUG_PORT.print(", \"uptime\" : ");
     DEBUG_PORT.print(millis());
     DEBUG_PORT.println("}}");
-
-  // display.clear();
-  // display.setCaret(0, 0);
-  // display.print("{\"diagnostics\" : {");
-  // display.print("\"averageTryCount\" : ");
-  // display.print(averageTryCount);
-  // display.print(", \"averageSatelliteCount\" : ");
-  // display.print(averageSatelliteCount);
-  // display.print(", \"averageWakeupPerLock\" : ");
-  // display.print(averageWakeupPerLock);
-  // display.print("}}");
-  // display.update();
-  
 }
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
@@ -274,20 +262,6 @@ static void doSomeWork( const gps_fix & fix )
     }else{
       DEBUG_PORT.println("failed to open file");
     }
-
-  // char buf[16]; // string buffer to convert timestamp
-  // ltoa(timestamp,buf,10);
-  // display.clear();
-  // display.setCaret(0, 0);
-  // display.print("{\"readings\" : [{\"timestamp\" : ");
-  // display.print(buf);
-  // display.print(", \"latitude\" : ");
-  // display.print(fix.latitude(), 8);
-  // display.print(", \"longitude\" : ");
-  // display.print(fix.longitude(),8 );
-  // display.print("}]}");
-  // display.update();
-  
     successfulLocks++; //diagnostics
     locks++; //diagnostics
     tries += triesThisTime;
@@ -321,6 +295,7 @@ void setup()
                    // Replace with your server's port
 
   pinMode(GPS_POWER, OUTPUT);
+  pinMode(DONT_CLEAR_BUFFER, INPUT);
   digitalWrite(GPS_POWER, HIGH);
   DEBUG_PORT.begin(9600);
   while (!DEBUG_PORT)
@@ -339,7 +314,7 @@ void setup()
     while (true);
   }
   //SD.remove("readings.txt");
-  DEBUG_PORT.println("initialization done.");
+  DEBUG_PORT.println("SD card alive.");
 
   #ifdef NMEAGPS_NO_MERGING
     DEBUG_PORT.println( F("Only displaying data from xxRMC sentences.\n  Other sentences may be parsed, but their data will not be displayed.") );
@@ -348,16 +323,6 @@ void setup()
   DEBUG_PORT.flush();
 
   gpsPort.begin(9600);
-
-
-  // // display
-  //  Wire.begin();
-  // display.init();
-  // display.clear();
-  // display.setScale(2);
-  // display.print("Ocean Crawler");
-  // display.setScale(1);
-  // display.update();
 }
 
 //--------------------------
@@ -391,10 +356,12 @@ void loop()
           gpsPort.begin(9600);
           delay(2000);
           DEBUG_PORT.println( "Waking up" );
-          if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD){
+          if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
             diagnostics();
             lastDiagnosticMessage = millis();
-            clearReadingsBuffer();
+            if(digitalRead(DONT_CLEAR_BUFFER) == LOW){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
+              clearReadingsBuffer();
+            }
           }
           
           watchdog = WATCHDOG_RESET;
