@@ -4,8 +4,8 @@ import requests
 import time
 import json
 
-location_url = "http://localhost:5167/addHistory"
-diagnostic_url = "http://localhost:5167/addDiagnostics"
+location_url = "http://localhost:5000/addHistory"
+diagnostic_url = "http://localhost:5000/addDiagnostics"
 # 1. Configure the serial port and baud rate
 # 'timeout=1' prevents the script from hanging forever if no data arrives
 PORT = 'COM3' 
