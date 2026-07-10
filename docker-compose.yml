@@ -2,21 +2,24 @@ version: '3.8'
 
 services:
   frontend:
-    build: .
-    container_name: react_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: react_frontend
     ports:
       - "80:80"
     depends_on:
-      - backend-service
+      - api
     networks:
       - app-network
 
-  backend-service:
-    image: node:20-alpine # Or your specific backend API image/build path
-    container_name: api_backend
-    # command: npm run start (example)
-    expose:
-      - "5000"
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dotnet_backend
+    ports:
+      - "5000:8080"
     networks:
       - app-network
 
