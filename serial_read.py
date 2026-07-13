@@ -30,16 +30,13 @@ try:
             
             print(decoded_string)
             if decoded_string[2:10] == "readings":
-                print("found a reading")
                 payload = json.loads(decoded_string)
-                print(payload['readings'])
+    
                 response = requests.post(location_url, json=payload['readings'])
                 print(response.status_code)
             elif decoded_string[2:13] == "diagnostics":
-                print("found a reading")
                 payload = json.loads(decoded_string)
                 payload['diagnostics']['timestamp'] = int(time.time())
-                print(payload['diagnostics'])
                 response = requests.post(diagnostic_url, json=payload['diagnostics'])
                 print(response.status_code)
 
