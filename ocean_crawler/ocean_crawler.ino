@@ -148,12 +148,10 @@ void clearReadingsBuffer(){
       hasMultipleElements = true;
     }
     DEBUG_PORT.println("]}");
-    
   }
-  bool everythingWorked = true;
+  bool everythingWorked = true; //TODO we need line by line confirmation so we don't lose data before wiping flash
   if(everythingWorked){
     SD.remove("readings.txt");
-    DEBUG_PORT.println("removed readings.txt");
   }
 }
 
@@ -268,11 +266,11 @@ static void doSomeWork( const gps_fix & fix )
     triesThisTime = 0;
   } else {
     // No valid location data yet!
-    DEBUG_PORT.print(fix.satellites);
-    DEBUG_PORT.print( " satellites" );
+    // DEBUG_PORT.print(fix.satellites);
+    // DEBUG_PORT.print( " satellites" );
+    // not required for benchmarking
   }
   totalSatellites += fix.satellites; // diagnostics
-  DEBUG_PORT.println();
 
 } // doSomeWork
 
