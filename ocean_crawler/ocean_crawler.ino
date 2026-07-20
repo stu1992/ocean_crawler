@@ -3,8 +3,6 @@
 #include <avr/wdt.h>
 #include <SPI.h>
 #include <SD.h>
-#include <Ethernet.h>
-#include <ArduinoJson.h>
 
 // pull out serial pins for upload
 // tx UNO pin 1 goes to rx gps pin
@@ -116,9 +114,11 @@ const int GPS_POWER = 8;
 const int SdchipSelect = 4;
 const int DONT_CLEAR_BUFFER = 7;
 unsigned long lastDiagnosticMessage = 0;
+unsigned long wokeUp = 0;
 
 // diagnostics
 
+uint32_t lastLockTimestamp = 0; // if we buffer diagnostics
 // retries
 unsigned int tries = 0;
 char triesThisTime = 0; // we only want to count tries for a successful lock
@@ -156,12 +156,21 @@ void clearReadingsBuffer(){
 
   // now print out diagnostics
 
-  File diagnosticsDataFileIn = SD.open("diagnostics.txt", FILE_READ);
+  File diagnosticsDataFileIn = SD.open("diag.txt", FILE_READ);
   while (diagnosticsDataFileIn.available()) {
-    DEBUG_PORT.print(diagnosticsDataFileIn.readStringUntil('\n'));
+    bool hasMultipleElements = false;
+    DEBUG_PORT.print("{\"diagnostics\":[");
+    for(int i = 0; i < REST_PAYLOAD_SIZE && diagnosticsDataFileIn.available() ; i ++ ){
+      if(hasMultipleElements){
+        DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
+      }
+      DEBUG_PORT.print(diagnosticsDataFileIn.readStringUntil('\n'));
+      hasMultipleElements = true;
+    }
+    DEBUG_PORT.println("]}");
   }
   if(everythingWorked){
-    SD.remove("diagnostics.txt");
+    SD.remove("diag.txt");
   }
 }
 
@@ -179,12 +188,13 @@ void diagnostics()
     DEBUG_PORT.print(averageWakeupPerLock);
     DEBUG_PORT.print(", \"uptime\" : ");
     DEBUG_PORT.print(millis());
+    DEBUG_PORT.print(", \"lastLockTimestamp\" : ");
+    DEBUG_PORT.print(lastLockTimestamp);
     DEBUG_PORT.println("}}");
 
-    File dataFileOut = SD.open("diagnostics.txt", FILE_WRITE | O_APPEND | O_CREAT);
+    File dataFileOut = SD.open("diag.txt", FILE_WRITE | O_APPEND | O_CREAT);
     if(dataFileOut){
-      dataFileOut.print("{\"diagnostics\" : {");
-      dataFileOut.print("\"averageTryCount\" : ");
+      dataFileOut.print("{\"averageTryCount\" : ");
       dataFileOut.print(averageTryCount);
       dataFileOut.print(", \"averageSatelliteCount\" : ");
       dataFileOut.print(averageSatelliteCount);
@@ -192,7 +202,9 @@ void diagnostics()
       dataFileOut.print(averageWakeupPerLock);
       dataFileOut.print(", \"uptime\" : ");
       dataFileOut.print(millis());
-      dataFileOut.print("}}\n");
+      dataFileOut.print(", \"lastLockTimestamp\" : ");
+      dataFileOut.print(lastLockTimestamp);
+      dataFileOut.print("}\n");
       dataFileOut.close();
     }else{
       DEBUG_PORT.println("failed to open diagnostics file");
@@ -214,6 +226,7 @@ static void doSomeWork( const gps_fix & fix )
     
     // // create payload for post
     uint32_t timestamp = (NeoGPS::clock_t) fix.dateTime + 946684800UL;
+    
     DEBUG_PORT.println("");
     DEBUG_PORT.print("UPDATE: {\"readings\" : [{\"timestamp\" : ");
     DEBUG_PORT.print(timestamp);
@@ -236,6 +249,8 @@ static void doSomeWork( const gps_fix & fix )
     }else{
       DEBUG_PORT.println("failed to open readings file");
     }
+
+    lastLockTimestamp = timestamp; // diagnostics
     successfulLocks++; //diagnostics
     locks++; //diagnostics
     tries += triesThisTime;
@@ -288,7 +303,7 @@ void setup()
     while (true);
   }
   //SD.remove("readings.txt");
-  //SD.remove("fiagnostics.txt");
+  //SD.remove("diag.txt");
   DEBUG_PORT.println("SD card alive.");
 
   #ifdef NMEAGPS_NO_MERGING
@@ -312,7 +327,8 @@ void loop()
         attempts++; //diagnostics
       }
       int powerDownPeriod = POWER_DOWN_PERIOD;
-      if(foundSignal || watchdog <= 0){
+      if(foundSignal || watchdog <= 0 ){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
+        
         DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
@@ -338,9 +354,10 @@ void loop()
               clearReadingsBuffer();
             }
           }
-          
+          wokeUp = millis();
           watchdog = WATCHDOG_RESET;
           wakeups++; //diagnostics
+          
       }else{
         watchdog --;
       }

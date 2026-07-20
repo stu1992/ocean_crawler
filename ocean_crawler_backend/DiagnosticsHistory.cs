@@ -10,8 +10,8 @@ public class DiagnosticsHistoryEntity
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("id")]
     public long id { get; set; }
-    [Column("timestamp")]
-    public long Timestamp { get; set; }
+    [Column("last_lock_timestamp")]
+    public long lastLockTimestamp { get; set; }
 
     [Column("crawler_id")]
     public int CrawlerId { get; set; }

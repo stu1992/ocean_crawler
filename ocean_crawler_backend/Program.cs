@@ -57,20 +57,23 @@ app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
 })
 .WithName("addHistory");
 
-app.MapPost("/addDiagnostics", (DiagnosticsDto diagnostics, DiagnosticsContext context) =>
+app.MapPost("/addDiagnostics", (List<DiagnosticsDto> diagnosticsList, DiagnosticsContext context) =>
 {
     //TODO authenticate via uuid to get CrawlerId
-    var entity = new DiagnosticsHistoryEntity
+    foreach (var diagnostics in diagnosticsList)
     {
-        CrawlerId = 1,
-        Timestamp = diagnostics.timestamp,
-        averageSatelliteCount = diagnostics.averageSatelliteCount,
-        averageTryCount = diagnostics.averageTryCount,
-        averageWakeupPerLock = diagnostics.averageWakeupPerLock,
-        Uptime = diagnostics.uptime
-    };
-    context.diagnostics_history.Add(entity);
-    context.SaveChanges();
+        var entity = new DiagnosticsHistoryEntity
+        {
+            CrawlerId = 1,
+            lastLockTimestamp = diagnostics.lastLockTimestamp,
+            averageSatelliteCount = diagnostics.averageSatelliteCount,
+            averageTryCount = diagnostics.averageTryCount,
+            averageWakeupPerLock = diagnostics.averageWakeupPerLock,
+            Uptime = diagnostics.uptime
+        };
+        context.diagnostics_history.Add(entity);
+        context.SaveChanges();
+    }
 })
 .WithName("addDiagnostics");
 
@@ -87,4 +90,4 @@ class LocationInfo()
 
 }
 
-public record DiagnosticsDto(long timestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock, long uptime);
+public record DiagnosticsDto(long lastLockTimestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock, long uptime);
