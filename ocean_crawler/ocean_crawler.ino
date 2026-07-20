@@ -110,8 +110,8 @@ const short WATCHDOG_RESET = 60;
 const short REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 600;
-const unsigned long DIAGNOSTIC_PERIOD = 500000;
+const unsigned long POWER_DOWN_PERIOD = 60;
+const unsigned long DIAGNOSTIC_PERIOD = 50000;
 const int GPS_POWER = 8;
 const int SdchipSelect = 4;
 const int DONT_CLEAR_BUFFER = 7;
@@ -136,15 +136,15 @@ unsigned int locks = 0;
 float averageWakeupPerLock = 0;
 
 void clearReadingsBuffer(){
-  File dataFileIn = SD.open("readings.txt", FILE_READ);
-  while (dataFileIn.available()) {
+  File readingsDataFileIn = SD.open("readings.txt", FILE_READ);
+  while (readingsDataFileIn.available()) {
     bool hasMultipleElements = false;
     DEBUG_PORT.print("{\"readings\":[");
-    for(int i = 0; i < REST_PAYLOAD_SIZE && dataFileIn.available() ; i ++ ){
+    for(int i = 0; i < REST_PAYLOAD_SIZE && readingsDataFileIn.available() ; i ++ ){
       if(hasMultipleElements){
         DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
       }
-      DEBUG_PORT.print(dataFileIn.readStringUntil('\n'));
+      DEBUG_PORT.print(readingsDataFileIn.readStringUntil('\n'));
       hasMultipleElements = true;
     }
     DEBUG_PORT.println("]}");
@@ -153,56 +153,15 @@ void clearReadingsBuffer(){
   if(everythingWorked){
     SD.remove("readings.txt");
   }
-}
 
-void sendJsonPost() {
-  EthernetClient client;
-  byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-  IPAddress server(192, 168, 0, 103); // Replace with your server's IP address
-  int port = 5167;   
-    if (Ethernet.begin(mac) == 0) {
-    DEBUG_PORT.println("Failed to configure Ethernet using DHCP");
-    while (true); // Halt execution
+  // now print out diagnostics
+
+  File diagnosticsDataFileIn = SD.open("diagnostics.txt", FILE_READ);
+  while (diagnosticsDataFileIn.available()) {
+    DEBUG_PORT.print(diagnosticsDataFileIn.readStringUntil('\n'));
   }
-  delay(1000); // Give the Ethernet shield a second to initialize
-
-  if (client.connect(server, port)) {
-    DEBUG_PORT.println("Connected to server. Sending POST...");
-
-    // 1. Create the JSON payload
-    StaticJsonDocument<200> doc;
-
-    doc[""] = "temperature";
-    doc["value"] = 24.5;
-    doc["status"] = "OK";
-
-    // 2. Measure the exact size of the payload string
-    size_t contentLength = measureJson(doc);
-
-    // 3. Send HTTP POST Headers
-    client.println("POST /addDiagnostics HTTP/1.1"); // Update to your API path
-    client.println("Host: 192.168.0.103");     // Update to your server Host/IP
-    client.println("Content-Type: application/json; charset=UTF-8");
-    client.print("Content-Length: ");
-    client.println(contentLength);
-    client.println("Connection: close");
-    client.println(); // CRITICAL: Blank line separating headers from body
-
-    // 4. Send the JSON Body
-    serializeJson(doc, client);
-    client.println();
-
-    // Read response from server
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        DEBUG_PORT.println(c); // Print response to Serial Monitor
-      }
-    }
-    client.stop();
-    DEBUG_PORT.println("\nDisconnected.");
-  } else {
-    DEBUG_PORT.println("Connection failed.");
+  if(everythingWorked){
+    SD.remove("diagnostics.txt");
   }
 }
 
@@ -211,7 +170,7 @@ void diagnostics()
   averageTryCount =  (float)tries / (float)successfulLocks;
   averageSatelliteCount = (float)totalSatellites / (float)attempts;
   averageWakeupPerLock = (float)wakeups / (float)locks;
-    DEBUG_PORT.print("{\"diagnostics\" : {");
+    DEBUG_PORT.print("UPDATE: {\"diagnostics\" : {");
     DEBUG_PORT.print("\"averageTryCount\" : ");
     DEBUG_PORT.print(averageTryCount);
     DEBUG_PORT.print(", \"averageSatelliteCount\" : ");
@@ -221,6 +180,23 @@ void diagnostics()
     DEBUG_PORT.print(", \"uptime\" : ");
     DEBUG_PORT.print(millis());
     DEBUG_PORT.println("}}");
+
+    File dataFileOut = SD.open("diagnostics.txt", FILE_WRITE | O_APPEND | O_CREAT);
+    if(dataFileOut){
+      dataFileOut.print("{\"diagnostics\" : {");
+      dataFileOut.print("\"averageTryCount\" : ");
+      dataFileOut.print(averageTryCount);
+      dataFileOut.print(", \"averageSatelliteCount\" : ");
+      dataFileOut.print(averageSatelliteCount);
+      dataFileOut.print(", \"averageWakeupPerLock\" : ");
+      dataFileOut.print(averageWakeupPerLock);
+      dataFileOut.print(", \"uptime\" : ");
+      dataFileOut.print(millis());
+      dataFileOut.print("}}\n");
+      dataFileOut.close();
+    }else{
+      DEBUG_PORT.println("failed to open diagnostics file");
+    }
 }
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
@@ -258,7 +234,7 @@ static void doSomeWork( const gps_fix & fix )
       dataFileOut.print("}\n");
       dataFileOut.close();
     }else{
-      DEBUG_PORT.println("failed to open file");
+      DEBUG_PORT.println("failed to open readings file");
     }
     successfulLocks++; //diagnostics
     locks++; //diagnostics
@@ -312,6 +288,7 @@ void setup()
     while (true);
   }
   //SD.remove("readings.txt");
+  //SD.remove("fiagnostics.txt");
   DEBUG_PORT.println("SD card alive.");
 
   #ifdef NMEAGPS_NO_MERGING
