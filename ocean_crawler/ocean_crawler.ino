@@ -108,8 +108,8 @@ const short WATCHDOG_RESET = 60;
 const short REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 60;
-const unsigned long DIAGNOSTIC_PERIOD = 50000;
+const unsigned long POWER_DOWN_PERIOD = 600;
+const unsigned long DIAGNOSTIC_PERIOD = 500000;
 const int GPS_POWER = 8;
 const int SdchipSelect = 4;
 const int DONT_CLEAR_BUFFER = 7;
@@ -327,8 +327,7 @@ void loop()
         attempts++; //diagnostics
       }
       int powerDownPeriod = POWER_DOWN_PERIOD;
-      if(foundSignal || watchdog <= 0 ){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
-        
+      if(foundSignal || watchdog <= 0 || millis() > wokeUp + ((int)WATCHDOG_RESET*2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
         DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
