@@ -104,8 +104,8 @@ static String stringL( int32_t degE7 )
 }
 // system globals
 //SSD1306 display;
-const short WATCHDOG_RESET = 60;
-const short REST_PAYLOAD_SIZE = 10;
+const int WATCHDOG_RESET = 60;
+const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
 const unsigned long POWER_DOWN_PERIOD = 600;
@@ -257,8 +257,8 @@ static void doSomeWork( const gps_fix & fix )
     triesThisTime = 0;
   } else {
     // No valid location data yet!
-    // DEBUG_PORT.print(fix.satellites);
-    // DEBUG_PORT.print( " satellites" );
+    DEBUG_PORT.print(fix.satellites);
+   DEBUG_PORT.println( " satellites" );
     // not required for benchmarking
   }
   totalSatellites += fix.satellites; // diagnostics
@@ -327,7 +327,11 @@ void loop()
         attempts++; //diagnostics
       }
       int powerDownPeriod = POWER_DOWN_PERIOD;
-      if(foundSignal || watchdog <= 0 || millis() > wokeUp + ((int)WATCHDOG_RESET*2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
+      // DEBUG_PORT.print(millis());
+      // DEBUG_PORT.print(" > ");
+      // DEBUG_PORT.print(wokeUp + ((unsigned long)WATCHDOG_RESET * 2000));
+      // DEBUG_PORT.println("?");
+      if(foundSignal || watchdog <= 0 || millis() > wokeUp + ((unsigned long)WATCHDOG_RESET * 2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
         DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
