@@ -1,5 +1,16 @@
 #include <NMEAGPS.h>
-
+// include file system library
+#include "FS.h"
+// include SD card library
+#include "SD.h"
+// include SPI library
+#include "SPI.h"
+// Define SD card connection
+#define SD_MOSI     23
+#define SD_MISO     19
+#define SD_SCLK     18
+#define SD_CS       5
+File myFile;
 //======================================================================
 //  Program: NMEAloc.ino
 //
@@ -40,6 +51,38 @@
 // 9600 baud rate for serial
 #include <GPSport.h>
 static const int RXPin = 16, TXPin = 17;
+
+// system globals
+const int WATCHDOG_RESET = 60;
+const int REST_PAYLOAD_SIZE = 10;
+int watchdog = WATCHDOG_RESET;
+bool foundSignal = false;
+const unsigned long POWER_DOWN_PERIOD = 600;
+const unsigned long DIAGNOSTIC_PERIOD = 500000;
+const int GPS_POWER = 8;
+const int SdchipSelect = 4;
+const int DONT_CLEAR_BUFFER = 7;
+unsigned long lastDiagnosticMessage = 0;
+unsigned long wokeUp = 0;
+
+// diagnostics
+
+uint32_t lastLockTimestamp = 0; // if we buffer diagnostics
+// retries
+unsigned int tries = 0;
+char triesThisTime = 0; // we only want to count tries for a successful lock
+unsigned int successfulLocks = 0;
+float averageTryCount = 0;
+
+// satelites
+unsigned int attempts = 0;
+unsigned int totalSatellites = 0;
+float averageSatelliteCount = 0;
+
+// wakups
+unsigned int wakeups = 0;
+unsigned int locks = 0;
+float averageWakeupPerLock = 0;
 
 //------------------------------------------------------------
 // Check that the config files are set up properly
@@ -102,6 +145,111 @@ static void printL( Print & outs, int32_t degE7 )
   // Print fractional degrees
   outs.print( degE7 );
 }
+static String stringL( int32_t degE7 );
+static String stringL( int32_t degE7 )
+{
+  String result = "";
+  // Extract and print negative sign
+  if (degE7 < 0) {
+    degE7 = -degE7;
+    result += ( '-' );
+  }
+
+  // Whole degrees
+  int32_t deg = degE7 / 10000000L;
+  result += ( deg );
+  result += ( '.' );
+
+  // Get fractional degrees
+  degE7 -= deg*10000000L;
+
+  // Print leading zeroes, if needed
+  int32_t factor = 1000000L;
+  while ((degE7 < factor) && (factor > 1L)){
+    result += ( '0' );
+    factor /= 10L;
+  }
+  
+  // Print fractional degrees
+  result += ( degE7 );
+  return result;
+}
+
+void clearReadingsBuffer(){
+  File readingsDataFileIn = SD.open("readings.txt");
+  while (readingsDataFileIn.available()) {
+    bool hasMultipleElements = false;
+    DEBUG_PORT.print("{\"readings\":[");
+    for(int i = 0; i < REST_PAYLOAD_SIZE && readingsDataFileIn.available() ; i ++ ){
+      if(hasMultipleElements){
+        DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
+      }
+      DEBUG_PORT.print(readingsDataFileIn.readStringUntil('\n'));
+      hasMultipleElements = true;
+    }
+    DEBUG_PORT.println("]}");
+  }
+  bool everythingWorked = true; //TODO we need line by line confirmation so we don't lose data before wiping flash
+  if(everythingWorked){
+    SD.remove("readings.txt");
+  }
+
+  // now print out diagnostics
+
+  File diagnosticsDataFileIn = SD.open("diag.txt");
+  while (diagnosticsDataFileIn.available()) {
+    bool hasMultipleElements = false;
+    DEBUG_PORT.print("{\"diagnostics\":[");
+    for(int i = 0; i < REST_PAYLOAD_SIZE && diagnosticsDataFileIn.available() ; i ++ ){
+      if(hasMultipleElements){
+        DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
+      }
+      DEBUG_PORT.print(diagnosticsDataFileIn.readStringUntil('\n'));
+      hasMultipleElements = true;
+    }
+    DEBUG_PORT.println("]}");
+  }
+  if(everythingWorked){
+    SD.remove("diag.txt");
+  }
+}
+
+void diagnostics()
+{
+  averageTryCount =  (float)tries / (float)successfulLocks;
+  averageSatelliteCount = (float)totalSatellites / (float)attempts;
+  averageWakeupPerLock = (float)wakeups / (float)locks;
+    DEBUG_PORT.print("UPDATE: {\"diagnostics\" : {");
+    DEBUG_PORT.print("\"averageTryCount\" : ");
+    DEBUG_PORT.print(averageTryCount);
+    DEBUG_PORT.print(", \"averageSatelliteCount\" : ");
+    DEBUG_PORT.print(averageSatelliteCount);
+    DEBUG_PORT.print(", \"averageWakeupPerLock\" : ");
+    DEBUG_PORT.print(averageWakeupPerLock);
+    DEBUG_PORT.print(", \"uptime\" : ");
+    DEBUG_PORT.print(millis());
+    DEBUG_PORT.print(", \"lastLockTimestamp\" : ");
+    DEBUG_PORT.print(lastLockTimestamp);
+    DEBUG_PORT.println("}}");
+
+    File dataFileOut = SD.open("diag.txt", FILE_APPEND);
+    if(dataFileOut){
+      dataFileOut.print("{\"averageTryCount\" : ");
+      dataFileOut.print(averageTryCount);
+      dataFileOut.print(", \"averageSatelliteCount\" : ");
+      dataFileOut.print(averageSatelliteCount);
+      dataFileOut.print(", \"averageWakeupPerLock\" : ");
+      dataFileOut.print(averageWakeupPerLock);
+      dataFileOut.print(", \"uptime\" : ");
+      dataFileOut.print(millis());
+      dataFileOut.print(", \"lastLockTimestamp\" : ");
+      dataFileOut.print(lastLockTimestamp);
+      dataFileOut.print("}\n");
+      dataFileOut.close();
+    }else{
+      DEBUG_PORT.println("failed to open diagnostics file");
+    }
+}
 
 static void doSomeWork( const gps_fix & fix );
 static void doSomeWork( const gps_fix & fix )
@@ -113,45 +261,48 @@ static void doSomeWork( const gps_fix & fix )
   //  For this example, we just print the lat/lon.  If you print too much,
   //     this routine will not get back to "loop()" in time to process
   //     the next set of GPS data.
-  if (fix.valid.location) {
-
-    DEBUG_PORT.print("20");
-    DEBUG_PORT.print(fix.dateTime.year);
-    DEBUG_PORT.print("/");
-    if ( fix.dateTime.month < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.month);
-    DEBUG_PORT.print("/");
-    if ( fix.dateTime.date < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.date);
-    DEBUG_PORT.print(" : ");
-    DEBUG_PORT.print(fix.dateTime.hours);
-    DEBUG_PORT.print(":");
-    if ( fix.dateTime.minutes < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.minutes);
-    DEBUG_PORT.print(":");
-    if ( fix.dateTime.seconds < 10 )
-      DEBUG_PORT.print( '0' );
-    DEBUG_PORT.print(fix.dateTime.seconds);
-    DEBUG_PORT.print(" -> ");
-
-    // DEBUG_PORT.print( fix.latitude(), 6 ); // floating-point display
-    // DEBUG_PORT.print( fix.latitudeL() ); // integer display
-    printL( DEBUG_PORT, fix.latitudeL() ); // prints int like a float
-    DEBUG_PORT.print( ',' );
-    // DEBUG_PORT.print( fix.longitude(), 6 ); // floating-point display
-    // DEBUG_PORT.print( fix.longitudeL() );  // integer display
-    printL( DEBUG_PORT, fix.longitudeL() ); // prints int like a float
+  if (fix.valid.location) { // && fix.satellites > 5
+    foundSignal = true;
+    watchdog = WATCHDOG_RESET;
     
+    // // create payload for post
+    uint32_t timestamp = (NeoGPS::clock_t) fix.dateTime + 946684800UL;
+    
+    DEBUG_PORT.println("");
+    DEBUG_PORT.print("UPDATE: {\"readings\" : [{\"timestamp\" : ");
+    DEBUG_PORT.print(timestamp);
+    DEBUG_PORT.print(", \"latitude\" : ");
+    printL( DEBUG_PORT, fix.latitudeL() );
+    DEBUG_PORT.print(", \"longitude\" : ");
+    printL( DEBUG_PORT, fix.longitudeL() );
+    DEBUG_PORT.println("}]}");
+
+    File dataFileOut = SD.open("readings.txt", FILE_APPEND);
+    if(dataFileOut){
+      dataFileOut.print("{\"timestamp\" : ");
+      dataFileOut.print(timestamp);
+      dataFileOut.print(", \"latitude\" : "); 
+      dataFileOut.print(stringL(fix.latitudeL()));
+      dataFileOut.print(", \"longitude\" : ");
+      dataFileOut.print(stringL(fix.longitudeL()));
+      dataFileOut.print("}\n");
+      dataFileOut.close();
+    }else{
+      DEBUG_PORT.println("failed to open readings file");
+    }
+
+    lastLockTimestamp = timestamp; // diagnostics
+    successfulLocks++; //diagnostics
+    locks++; //diagnostics
+    tries += triesThisTime;
+    triesThisTime = 0;
   } else {
     // No valid location data yet!
-    DEBUG_PORT.print(fix.satellites );
-    DEBUG_PORT.println(" satellites" );
+    DEBUG_PORT.print(fix.satellites);
+   DEBUG_PORT.println( " satellites" );
+    // not required for benchmarking
   }
-
-  DEBUG_PORT.println();
+  totalSatellites += fix.satellites; // diagnostics
 
 } // doSomeWork
 
@@ -188,6 +339,16 @@ void setup()
 
   DEBUG_PORT.flush();
 
+  SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+  if (!SD.begin(SD_CS)) 
+  {
+    Serial.println("SD Card MOUNT FAIL");
+  } 
+  else 
+  {
+    Serial.println("SD Card MOUNT SUCCESS"); 
+  }
+
   Serial2.begin(9600, SERIAL_8N1, RXPin, TXPin); 
 }
 
@@ -195,5 +356,51 @@ void setup()
 
 void loop()
 {
-  GPSloop();
+   while (gps.available( gpsPort )){
+      while(foundSignal == false && gps.available( gpsPort )){
+        doSomeWork( gps.read() );
+        triesThisTime++; //diagnostics
+        attempts++; //diagnostics
+      }
+      int powerDownPeriod = POWER_DOWN_PERIOD;
+      // DEBUG_PORT.print(millis());
+      // DEBUG_PORT.print(" > ");
+      // DEBUG_PORT.print(wokeUp + ((unsigned long)WATCHDOG_RESET * 2000));
+      // DEBUG_PORT.println("?");
+      if(foundSignal || watchdog <= 0 || millis() > wokeUp + ((unsigned long)WATCHDOG_RESET * 2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
+        DEBUG_PORT.println( "Sleeping" );
+        DEBUG_PORT.flush();
+        DEBUG_PORT.end();
+        gpsPort.flush();
+        gpsPort.end();
+        digitalWrite(GPS_POWER, LOW);
+        while(powerDownPeriod > 0){
+          delay(8000);
+          //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
+          powerDownPeriod -= 8;
+        }
+          digitalWrite(GPS_POWER, HIGH);
+          delay(2000);
+          DEBUG_PORT.begin(9600);
+          while (!DEBUG_PORT)
+          delay(2000);
+          gpsPort.begin(9600);
+          delay(2000);
+          DEBUG_PORT.println( "Waking up" );
+          if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
+            diagnostics();
+            lastDiagnosticMessage = millis();
+            if(digitalRead(DONT_CLEAR_BUFFER) == LOW){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
+              clearReadingsBuffer();
+            }
+          }
+          wokeUp = millis();
+          watchdog = WATCHDOG_RESET;
+          wakeups++; //diagnostics
+          
+      }else{
+        watchdog --;
+      }
+      foundSignal = false; // reset until the next power on
+    }
 }
