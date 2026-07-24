@@ -58,7 +58,7 @@ const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
 const unsigned long POWER_DOWN_PERIOD = 10;
-const unsigned long DIAGNOSTIC_PERIOD = 50;
+const unsigned long DIAGNOSTIC_PERIOD = 50000;
 const int GPS_POWER = 8;
 const int SdchipSelect = 4;
 bool networkUp = true;
@@ -84,7 +84,9 @@ unsigned int wakeups = 0;
 unsigned int locks = 0;
 float averageWakeupPerLock = 0;
 
-// file consts
+// const files
+const char* readingsFile = "/readings.txt";
+const char* diagnosticsFile = "/diag.txt";
 
 //------------------------------------------------------------
 // Check that the config files are set up properly
@@ -178,8 +180,7 @@ static String stringL( int32_t degE7 )
 }
 
 void clearReadingsBuffer(){
-  DEBUG_PORT.print("flushing readings");
-  File readingsDataFileIn = SD.open("/readings.txt");
+  File readingsDataFileIn = SD.open(readingsFile);
   while (readingsDataFileIn.available()) {
     bool hasMultipleElements = false;
     DEBUG_PORT.print("{\"readings\":[");
@@ -194,12 +195,11 @@ void clearReadingsBuffer(){
   }
   bool everythingWorked = true; //TODO we need line by line confirmation so we don't lose data before wiping flash
   if(everythingWorked){
-    SD.remove("/readings.txt");
+    SD.remove(readingsFile);
   }
 
   // now print out diagnostics
-  DEBUG_PORT.print("flushing diagnostics");
-  File diagnosticsDataFileIn = SD.open("/diag.txt");
+  File diagnosticsDataFileIn = SD.open(diagnosticsFile);
   while (diagnosticsDataFileIn.available()) {
     bool hasMultipleElements = false;
     DEBUG_PORT.print("{\"diagnostics\":[");
@@ -213,7 +213,7 @@ void clearReadingsBuffer(){
     DEBUG_PORT.println("]}");
   }
   if(everythingWorked){
-    SD.remove("/diag.txt");
+    SD.remove(diagnosticsFile);
   }
 }
 
@@ -235,7 +235,7 @@ void diagnostics()
     DEBUG_PORT.print(lastLockTimestamp);
     DEBUG_PORT.println("}}");
 
-    File dataFileOut = SD.open("/diag.txt", FILE_WRITE );
+    File dataFileOut = SD.open(diagnosticsFile, FILE_APPEND);
     if(dataFileOut){
       dataFileOut.print("{\"averageTryCount\" : ");
       dataFileOut.print(averageTryCount);
@@ -280,7 +280,7 @@ static void doSomeWork( const gps_fix & fix )
     printL( DEBUG_PORT, fix.longitudeL() );
     DEBUG_PORT.println("}]}");
 
-    File dataFileOut = SD.open("/readings.txt", FILE_WRITE );
+    File dataFileOut = SD.open(readingsFile, FILE_APPEND);
     if(dataFileOut){
       dataFileOut.print("{\"timestamp\" : ");
       dataFileOut.print(timestamp);
@@ -325,6 +325,8 @@ static void GPSloop()
 
 void setup()
 {
+
+
   DEBUG_PORT.begin(115200);
   while (!DEBUG_PORT)
     ;
@@ -350,10 +352,10 @@ void setup()
   else 
   {
     Serial.println("SD Card MOUNT SUCCESS"); 
-    // SD.remove("/diag.txt");
-    // SD.remove("/readings.txt");
+    // SD.remove(diagnosticsFile);
+    // SD.remove(readingsFile);
 
-    // File dataFileOut = SD.open("/diag.txt", FILE_WRITE );
+    // File dataFileOut = SD.open(diagnosticsFile, FILE_WRITE );
     // if(dataFileOut){
     //   dataFileOut.print("\n");
     //   dataFileOut.close();
@@ -361,7 +363,7 @@ void setup()
     //   Serial.println("diag failed"); 
     // }
 
-    // File readFileOut = SD.open("/readings.txt", FILE_WRITE );
+    // File readFileOut = SD.open(readingsFile, FILE_WRITE );
     // if(readFileOut){
     //   readFileOut.print("\n");
     //   readFileOut.close();
@@ -371,6 +373,11 @@ void setup()
   }
 
   Serial2.begin(9600, SERIAL_8N1, RXPin, TXPin); 
+
+    // I want to reset the GPS module on first play incase something corrupts
+  digitalWrite(GPS_POWER, LOW);
+  delay(1000);
+  digitalWrite(GPS_POWER, HIGH);
 }
 
 //--------------------------
@@ -410,11 +417,12 @@ void loop()
           DEBUG_PORT.println( "Waking up" );
           if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
             diagnostics();
+            if(networkUp){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
+              clearReadingsBuffer();
+            }
             lastDiagnosticMessage = millis();
           }
-          if(networkUp){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
-            clearReadingsBuffer();
-          }
+
           wokeUp = millis();
           watchdog = WATCHDOG_RESET;
           wakeups++; //diagnostics
