@@ -1,4 +1,13 @@
+#include secrets.h
 #include <NMEAGPS.h>
+
+// wifi library
+#include <WiFi.h>
+//#include <WiFiMulti.h>
+
+#include <HTTPClient.h>
+HTTPClient http;
+
 // include file system library
 #include "FS.h"
 // include SD card library
@@ -54,12 +63,13 @@ static const int RXPin = 16, TXPin = 17;
 
 // system globals
 const int WATCHDOG_RESET = 60;
+const int WATCHDOG_WIFI = 15;
 const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 10;
-const unsigned long DIAGNOSTIC_PERIOD = 50000;
-const int GPS_POWER = 8;
+const unsigned long POWER_DOWN_PERIOD = 60;
+const unsigned long DIAGNOSTIC_PERIOD = 120000;
+const int GPS_POWER = 22;
 const int SdchipSelect = 4;
 bool networkUp = true;
 unsigned long lastDiagnosticMessage = 0;
@@ -180,40 +190,81 @@ static String stringL( int32_t degE7 )
 }
 
 void clearReadingsBuffer(){
-  File readingsDataFileIn = SD.open(readingsFile);
-  while (readingsDataFileIn.available()) {
-    bool hasMultipleElements = false;
-    DEBUG_PORT.print("{\"readings\":[");
-    for(int i = 0; i < REST_PAYLOAD_SIZE && readingsDataFileIn.available() ; i ++ ){
-      if(hasMultipleElements){
-        DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
-      }
-      DEBUG_PORT.print(readingsDataFileIn.readStringUntil('\n'));
-      hasMultipleElements = true;
-    }
-    DEBUG_PORT.println("]}");
-  }
-  bool everythingWorked = true; //TODO we need line by line confirmation so we don't lose data before wiping flash
-  if(everythingWorked){
-    SD.remove(readingsFile);
+  // fire up wifi conneciton
+  int connectionAttempt = 0;
+  WiFi.begin("SSID", WIFI_PASS);
+  Serial.println("Connecting");
+  while (WiFi.status() != WL_CONNECTED || connectionAttempt < WATCHDOG_WIFI) {
+    delay(1000);
+    connectionAttempt ++;
+    Serial.print(".");
   }
 
-  // now print out diagnostics
-  File diagnosticsDataFileIn = SD.open(diagnosticsFile);
-  while (diagnosticsDataFileIn.available()) {
-    bool hasMultipleElements = false;
-    DEBUG_PORT.print("{\"diagnostics\":[");
-    for(int i = 0; i < REST_PAYLOAD_SIZE && diagnosticsDataFileIn.available() ; i ++ ){
-      if(hasMultipleElements){
-        DEBUG_PORT.print(","); // technically not correct JSON if we have a leading or trailing comma
-      }
-      DEBUG_PORT.print(diagnosticsDataFileIn.readStringUntil('\n'));
+  // try and connect
+  bool everythingWorked = true; // blunt tool to not remove unpersisted events.
+  if ((WiFi.status() == WL_CONNECTED)) {
+    HTTPClient http;
+    WiFiClient client;
+      // Your Domain name with URL path or IP address with path
+
+
+    // construct our json body for post
+    
+    File readingsDataFileIn = SD.open(readingsFile);
+    while (readingsDataFileIn.available()) {
+      http.begin(client, "http://192.168.0.150/api/addHistory");
+      http.addHeader("content-type", "application/json");
+      bool hasMultipleElements = false;
+      String httpRequestDataReadings = "";
+      httpRequestDataReadings+="[";
+      for(int i = 0; i < REST_PAYLOAD_SIZE && readingsDataFileIn.available() ; i ++ ){
+        if(hasMultipleElements){
+          httpRequestDataReadings +=","; // technically not correct JSON if we have a leading or trailing comma
+        }
+      httpRequestDataReadings+=(readingsDataFileIn.readStringUntil('\n'));
       hasMultipleElements = true;
+      }
+      httpRequestDataReadings+= "]";
+    int httpResponseCodeReadings = http.POST(httpRequestDataReadings);
+    Serial.println(httpRequestDataReadings);
+    Serial.println(httpResponseCodeReadings);
+    if(httpResponseCodeReadings != 200){
+      everythingWorked = false;
     }
-    DEBUG_PORT.println("]}");
-  }
+    http.end();
+    delay(1000);
+    }
+
+    File diagnosticsDataFileIn = SD.open(diagnosticsFile);
+    while (diagnosticsDataFileIn.available()) {
+      http.begin(client, "http://192.168.0.150/api/addDiagnostics");
+      http.addHeader("content-type", "application/json");
+      bool hasMultipleElements = false;
+      String httpRequestDataDiagnostics = "";
+      httpRequestDataDiagnostics+="[";
+      for(int i = 0; i < REST_PAYLOAD_SIZE && diagnosticsDataFileIn.available() ; i ++ ){
+        if(hasMultipleElements){
+          httpRequestDataDiagnostics +=","; // technically not correct JSON if we have a leading or trailing comma
+        }
+      httpRequestDataDiagnostics+=(diagnosticsDataFileIn.readStringUntil('\n'));
+      hasMultipleElements = true;
+      }
+      httpRequestDataDiagnostics+= "]";
+    int httpResponseCodeDiagnostics = http.POST(httpRequestDataDiagnostics);
+    Serial.println(httpRequestDataDiagnostics);
+    Serial.println(httpResponseCodeDiagnostics);
+    if(httpResponseCodeDiagnostics != 200){
+      everythingWorked = false;
+    }
+    http.end();
+    delay(1000);
+    }
   if(everythingWorked){
+    SD.remove(readingsFile);
     SD.remove(diagnosticsFile);
+  }
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
   }
 }
 
@@ -326,7 +377,6 @@ static void GPSloop()
 void setup()
 {
 
-
   DEBUG_PORT.begin(115200);
   while (!DEBUG_PORT)
     ;
@@ -373,11 +423,6 @@ void setup()
   }
 
   Serial2.begin(9600, SERIAL_8N1, RXPin, TXPin); 
-
-    // I want to reset the GPS module on first play incase something corrupts
-  digitalWrite(GPS_POWER, LOW);
-  delay(1000);
-  digitalWrite(GPS_POWER, HIGH);
 }
 
 //--------------------------
@@ -417,9 +462,10 @@ void loop()
           DEBUG_PORT.println( "Waking up" );
           if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
             diagnostics();
-            if(networkUp){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
-              clearReadingsBuffer();
-            }
+            clearReadingsBuffer();
+            // if(networkUp){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
+            //   clearReadingsBuffer();
+            // }
             lastDiagnosticMessage = millis();
           }
 
