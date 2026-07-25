@@ -11,6 +11,8 @@ builder.Services.AddDbContext<GpsContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddDbContext<DiagnosticsContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<CrawlerContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddOpenApi();
 
@@ -22,10 +24,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.MapGet("/locationHistory", (GpsContext context) =>
+app.MapGet("/locationHistory/{crawlerId}", (int crawlerId, GpsContext gpsContext) =>
 {
     var result = new LocationInfo();
-    var ideas = context.gps_history
+    var ideas = gpsContext.gps_history
+        .Where(u => u.CrawlerId == crawlerId)
         .OrderByDescending(b => b.Timestamp)
         .Take(200);
     ideas.ToList();
@@ -39,47 +42,54 @@ app.MapGet("/locationHistory", (GpsContext context) =>
 })
 .WithName("locationHistory");
 
-app.MapPost("/addHistory", (List<GpsData> locations, GpsContext context) =>
+app.MapPost("/addHistory", (HistoryDto payload, GpsContext readings, CrawlerContext crawlersContext) =>
 {
-    //TODO authenticate via uuid to get CrawlerId
-    foreach( var point in locations){
-        var entity = new GpsHistoryEntity
+    var crawlerFound = crawlersContext.crawlers.SingleOrDefault(u => u.uuid == payload.uuid);
+    if (crawlerFound != null)
+    {
+        foreach (var point in payload.readings)
         {
-            CrawlerId = 1,
-            Timestamp = point.timestamp,
-            Longitude = point.longitude,
-            Latitude = point.latitude
-        };
-        context.gps_history.Add(entity);
-        context.SaveChanges();
+            var entity = new GpsHistoryEntity
+            {
+                CrawlerId = crawlerFound!.id,
+                Timestamp = point.timestamp,
+                Longitude = point.longitude,
+                Latitude = point.latitude
+            };
+            readings.gps_history.Add(entity);
+            readings.SaveChanges();
+        }
     }
 
 })
 .WithName("addHistory");
 
-app.MapPost("/addDiagnostics", (List<DiagnosticsDto> diagnosticsList, DiagnosticsContext context) =>
+app.MapPost("/addDiagnostics", (DiagnosticsDto payload, DiagnosticsContext diagnosticsContext, CrawlerContext crawlersContext) =>
 {
-    //TODO authenticate via uuid to get CrawlerId
-    foreach (var diagnostics in diagnosticsList)
+    var crawlerFound = crawlersContext.crawlers.SingleOrDefault(u => u.uuid == payload.uuid);
+    if (crawlerFound != null)
     {
-        var entity = new DiagnosticsHistoryEntity
+        foreach (var diag in payload.diagnostics)
         {
-            CrawlerId = 1,
-            lastLockTimestamp = diagnostics.lastLockTimestamp,
-            averageSatelliteCount = diagnostics.averageSatelliteCount,
-            averageTryCount = diagnostics.averageTryCount,
-            averageWakeupPerLock = diagnostics.averageWakeupPerLock,
-            Uptime = diagnostics.uptime
-        };
-        context.diagnostics_history.Add(entity);
-        context.SaveChanges();
+            var entity = new DiagnosticsHistoryEntity
+            {
+                CrawlerId = 1,
+                lastLockTimestamp = diag.lastLockTimestamp,
+                averageSatelliteCount = diag.averageSatelliteCount,
+                averageTryCount = diag.averageTryCount,
+                averageWakeupPerLock = diag.averageWakeupPerLock,
+                Uptime = diag.uptime
+            };
+            diagnosticsContext.diagnostics_history.Add(entity);
+            diagnosticsContext.SaveChanges();
+        }
     }
 })
 .WithName("addDiagnostics");
 
 app.Run();
 
-public record HistoryDto(string uuid, List<GpsData> locations);
+public record HistoryDto(string uuid, List<GpsData> readings);
 
 public record GpsData(long timestamp, double longitude, double latitude);
 class LocationInfo()
@@ -89,5 +99,6 @@ class LocationInfo()
     public List<GpsData> GpsHistory = new List<GpsData>();
 
 }
+public record DiagnosticsDto(string uuid, List<Diagnostics> diagnostics);
 
-public record DiagnosticsDto(long lastLockTimestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock, long uptime);
+public record Diagnostics(long lastLockTimestamp, double averageTryCount, double averageSatelliteCount, double averageWakeupPerLock, long uptime);

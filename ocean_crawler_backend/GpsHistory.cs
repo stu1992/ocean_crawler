@@ -9,7 +9,7 @@ public class GpsHistoryEntity
 {
     [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Column("id")]
-    public long id { get; set; }
+    public int id { get; set; }
     [Column("timestamp")]
     public long Timestamp { get; set; }
 

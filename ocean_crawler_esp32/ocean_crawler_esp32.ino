@@ -1,4 +1,4 @@
-#include secrets.h
+#include "secrets.h"
 #include <NMEAGPS.h>
 
 // wifi library
@@ -68,7 +68,7 @@ const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
 const unsigned long POWER_DOWN_PERIOD = 60;
-const unsigned long DIAGNOSTIC_PERIOD = 120000;
+const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60 * 10;
 const int GPS_POWER = 22;
 const int SdchipSelect = 4;
 bool networkUp = true;
@@ -94,6 +94,8 @@ unsigned int wakeups = 0;
 unsigned int locks = 0;
 float averageWakeupPerLock = 0;
 
+// crawler identification
+const char* uuid =  "d9b9e24a-f66d-49ea-a7d3-42b770560bc6";
 // const files
 const char* readingsFile = "/readings.txt";
 const char* diagnosticsFile = "/diag.txt";
@@ -192,7 +194,7 @@ static String stringL( int32_t degE7 )
 void clearReadingsBuffer(){
   // fire up wifi conneciton
   int connectionAttempt = 0;
-  WiFi.begin("SSID", WIFI_PASS);
+  WiFi.begin(SSID, WIFI_PASS);
   Serial.println("Connecting");
   while (WiFi.status() != WL_CONNECTED || connectionAttempt < WATCHDOG_WIFI) {
     delay(1000);
@@ -215,7 +217,7 @@ void clearReadingsBuffer(){
       http.begin(client, "http://192.168.0.150/api/addHistory");
       http.addHeader("content-type", "application/json");
       bool hasMultipleElements = false;
-      String httpRequestDataReadings = "";
+      String httpRequestDataReadings = "{\"uuid\":\""+String(UUID)+"\", \"readings\":";
       httpRequestDataReadings+="[";
       for(int i = 0; i < REST_PAYLOAD_SIZE && readingsDataFileIn.available() ; i ++ ){
         if(hasMultipleElements){
@@ -224,7 +226,7 @@ void clearReadingsBuffer(){
       httpRequestDataReadings+=(readingsDataFileIn.readStringUntil('\n'));
       hasMultipleElements = true;
       }
-      httpRequestDataReadings+= "]";
+      httpRequestDataReadings+= "]}";
     int httpResponseCodeReadings = http.POST(httpRequestDataReadings);
     Serial.println(httpRequestDataReadings);
     Serial.println(httpResponseCodeReadings);
@@ -240,7 +242,7 @@ void clearReadingsBuffer(){
       http.begin(client, "http://192.168.0.150/api/addDiagnostics");
       http.addHeader("content-type", "application/json");
       bool hasMultipleElements = false;
-      String httpRequestDataDiagnostics = "";
+      String httpRequestDataDiagnostics = "{\"uuid\":\""+String(UUID)+"\", \"diagnostics\":";;
       httpRequestDataDiagnostics+="[";
       for(int i = 0; i < REST_PAYLOAD_SIZE && diagnosticsDataFileIn.available() ; i ++ ){
         if(hasMultipleElements){
@@ -249,7 +251,7 @@ void clearReadingsBuffer(){
       httpRequestDataDiagnostics+=(diagnosticsDataFileIn.readStringUntil('\n'));
       hasMultipleElements = true;
       }
-      httpRequestDataDiagnostics+= "]";
+      httpRequestDataDiagnostics+= "]}";
     int httpResponseCodeDiagnostics = http.POST(httpRequestDataDiagnostics);
     Serial.println(httpRequestDataDiagnostics);
     Serial.println(httpResponseCodeDiagnostics);

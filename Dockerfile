@@ -38,6 +38,7 @@ RUN dotnet restore
 RUN dotnet publish "ocean_crawler_backend.csproj" -c Release -o /App/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS dotnet_backend
+RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
 WORKDIR /App/
 COPY --from=back-end-build /App/publish/ .
 EXPOSE 8080
