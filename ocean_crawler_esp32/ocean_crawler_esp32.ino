@@ -67,8 +67,8 @@ const int WATCHDOG_WIFI = 15;
 const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 60;
-const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60 * 10;
+const unsigned long POWER_DOWN_PERIOD = 600;
+const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60 * 60 * 2;
 const int GPS_POWER = 22;
 const int SdchipSelect = 4;
 bool networkUp = true;
@@ -213,7 +213,7 @@ void clearReadingsBuffer(){
     // construct our json body for post
     
     File readingsDataFileIn = SD.open(readingsFile);
-    while (readingsDataFileIn.available()) {
+    while (readingsDataFileIn.available() && everythingWorked) {
       http.begin(client, "http://192.168.0.150/api/addHistory");
       http.addHeader("content-type", "application/json");
       bool hasMultipleElements = false;
@@ -465,9 +465,6 @@ void loop()
           if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
             diagnostics();
             clearReadingsBuffer();
-            // if(networkUp){ // temporary fix for me to have my readings outside on a battery and not trigger a serial port dump
-            //   clearReadingsBuffer();
-            // }
             lastDiagnosticMessage = millis();
           }
 

@@ -24,19 +24,36 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.MapGet("/crawlers", (CrawlerContext crawlersContext) =>
+{
+    var result = new Dictionary<string, int>();
+    var crawlers = crawlersContext.crawlers.ToList();
+    foreach (var crawler in crawlers)
+    {
+        if(crawler.name != null) {
+            result[crawler.name] = crawler.id;
+        }
+        
+    }
+    var jsonString = JsonConvert.SerializeObject(result);
+    return jsonString;
+})
+.WithName("crawlers");
+
 app.MapGet("/locationHistory/{crawlerId}", (int crawlerId, GpsContext gpsContext) =>
 {
     var result = new LocationInfo();
-    var ideas = gpsContext.gps_history
+    var locations = gpsContext.gps_history
         .Where(u => u.CrawlerId == crawlerId)
         .OrderByDescending(b => b.Timestamp)
         .Take(200);
-    ideas.ToList();
-    foreach (var data in ideas){
+    locations.ToList();
+    foreach (var data in locations)
+    {
         result.GpsHistory.Add(new GpsData(data.Timestamp, data.Latitude, data.Longitude));
     }
-    result.currentLatitude = ideas?.Last().Latitude ?? 0.0;
-    result.currentLongitude = ideas?.Last().Longitude ?? 0.0;
+    result.currentLatitude = locations?.Last().Latitude ?? 0.0;
+    result.currentLongitude = locations?.Last().Longitude ?? 0.0;
     var jsonString = JsonConvert.SerializeObject(result);
     return jsonString;
 })

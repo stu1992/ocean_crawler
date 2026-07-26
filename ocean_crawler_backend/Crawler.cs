@@ -13,6 +13,9 @@ public class CrawlerEntity
     public int id { get; set; }
     [Column("crawler_uuid")]
     public String uuid { get; set; }
+    [Column("name")]
+    public String? name { get; set; }
+
 }
 
 
