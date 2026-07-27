@@ -33,21 +33,22 @@ function App() {
 
   return (
         <>
-    <h1>Ocean Crawler</h1>
-    { crawlerSelect != null &&
-      <select 
-        id="fruit-select" 
-        value={crawlerSelect[0].value} 
-        onChange={handleChange}
-      >
-        <option value="1" disabled>select a crawler</option>
-        {crawlerSelect.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    }
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '10px' }}>
+          <h1>Ocean Crawler</h1>
+          { crawlerSelect != null &&
+            <select
+              id="fruit-select" 
+              value={crawlerSelect.filter(crawler => crawler.value === Number(selectedValue))[0].value} 
+              onChange={handleChange}
+            >
+              {crawlerSelect.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          }
+      </div>
     <div className="App">
       {gpsData !== undefined && gpsData !== null && <Map gpsData={gpsData}/> }
     </div>
