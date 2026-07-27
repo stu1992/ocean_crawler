@@ -317,7 +317,7 @@ static void doSomeWork( const gps_fix & fix )
   //  For this example, we just print the lat/lon.  If you print too much,
   //     this routine will not get back to "loop()" in time to process
   //     the next set of GPS data.
-  if (fix.valid.location) { // && fix.satellites > 5
+  if (fix.valid.location && fix.satellites >= 6) {
     foundSignal = true;
     watchdog = WATCHDOG_RESET;
     
