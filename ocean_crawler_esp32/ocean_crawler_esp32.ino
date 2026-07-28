@@ -67,31 +67,32 @@ const int WATCHDOG_WIFI = 15;
 const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 600;
-const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60 * 60 * 2;
+const unsigned long POWER_DOWN_PERIOD = 1200; // seconds
+const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60; // milliseconds
 const int GPS_POWER = 22;
 const int SdchipSelect = 4;
 bool networkUp = true;
-unsigned long lastDiagnosticMessage = 0;
-unsigned long wokeUp = 0;
+RTC_DATA_ATTR unsigned long lastDiagnosticMessage = 0;
+RTC_DATA_ATTR unsigned long millisTracked = 0;
+RTC_DATA_ATTR unsigned long wokeUp = 0;
 
 // diagnostics
 
-uint32_t lastLockTimestamp = 0; // if we buffer diagnostics
+RTC_DATA_ATTR  uint32_t lastLockTimestamp = 0; // if we buffer diagnostics
 // retries
-unsigned int tries = 0;
+RTC_DATA_ATTR  unsigned int tries = 0;
 char triesThisTime = 0; // we only want to count tries for a successful lock
-unsigned int successfulLocks = 0;
+RTC_DATA_ATTR unsigned int successfulLocks = 0;
 float averageTryCount = 0;
 
 // satelites
-unsigned int attempts = 0;
-unsigned int totalSatellites = 0;
+RTC_DATA_ATTR unsigned int attempts = 0;
+RTC_DATA_ATTR unsigned int totalSatellites = 0;
 float averageSatelliteCount = 0;
 
 // wakups
-unsigned int wakeups = 0;
-unsigned int locks = 0;
+RTC_DATA_ATTR unsigned int wakeups = 0;
+RTC_DATA_ATTR unsigned int locks = 0;
 float averageWakeupPerLock = 0;
 
 // crawler identification
@@ -201,6 +202,7 @@ void clearReadingsBuffer(){
     connectionAttempt ++;
     Serial.print(".");
   }
+  Serial.println("");
 
   // try and connect
   bool everythingWorked = true; // blunt tool to not remove unpersisted events.
@@ -283,7 +285,7 @@ void diagnostics()
     DEBUG_PORT.print(", \"averageWakeupPerLock\" : ");
     DEBUG_PORT.print(averageWakeupPerLock);
     DEBUG_PORT.print(", \"uptime\" : ");
-    DEBUG_PORT.print(millis());
+    DEBUG_PORT.print(millisTracked);
     DEBUG_PORT.print(", \"lastLockTimestamp\" : ");
     DEBUG_PORT.print(lastLockTimestamp);
     DEBUG_PORT.println("}}");
@@ -297,7 +299,7 @@ void diagnostics()
       dataFileOut.print(", \"averageWakeupPerLock\" : ");
       dataFileOut.print(averageWakeupPerLock);
       dataFileOut.print(", \"uptime\" : ");
-      dataFileOut.print(millis());
+      dataFileOut.print(millisTracked);
       dataFileOut.print(", \"lastLockTimestamp\" : ");
       dataFileOut.print(lastLockTimestamp);
       dataFileOut.print("}\n");
@@ -378,7 +380,6 @@ static void GPSloop()
 
 void setup()
 {
-
   DEBUG_PORT.begin(115200);
   while (!DEBUG_PORT)
     ;
@@ -404,6 +405,7 @@ void setup()
   else 
   {
     Serial.println("SD Card MOUNT SUCCESS"); 
+    wakeups++; //diagnostics
     // SD.remove(diagnosticsFile);
     // SD.remove(readingsFile);
 
@@ -442,36 +444,25 @@ void loop()
       // DEBUG_PORT.print(" > ");
       // DEBUG_PORT.print(wokeUp + ((unsigned long)WATCHDOG_RESET * 2000));
       // DEBUG_PORT.println("?");
-      if(foundSignal || watchdog <= 0 || millis() > wokeUp + ((unsigned long)WATCHDOG_RESET * 2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
+      if(foundSignal || watchdog <= 0 || millis() > ((unsigned long)WATCHDOG_RESET * 2000)){// wokeUp will give us a rtc timeout. time out if gps serial is stalling
+        DEBUG_PORT.println(lastDiagnosticMessage);
+        DEBUG_PORT.println(millisTracked);
+        millisTracked+= millis();
+        if(millisTracked > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
+          diagnostics();
+          lastDiagnosticMessage = millisTracked;
+          clearReadingsBuffer();
+        }
         DEBUG_PORT.println( "Sleeping" );
         DEBUG_PORT.flush();
         DEBUG_PORT.end();
         gpsPort.flush();
         Serial2.end();
         digitalWrite(GPS_POWER, LOW);
-        while(powerDownPeriod > 0){
-          delay(8000);
-          //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
-          powerDownPeriod -= 8;
-        }
-          digitalWrite(GPS_POWER, HIGH);
-          delay(2000);
-          DEBUG_PORT.begin(115200);
-          while (!DEBUG_PORT)
-          delay(2000);
-          Serial2.begin(9600, SERIAL_8N1, RXPin, TXPin); 
-          delay(2000);
-          DEBUG_PORT.println( "Waking up" );
-          if(millis() > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
-            diagnostics();
-            clearReadingsBuffer();
-            lastDiagnosticMessage = millis();
-          }
-
-          wokeUp = millis();
-          watchdog = WATCHDOG_RESET;
-          wakeups++; //diagnostics
-          
+        // power down
+       
+        esp_sleep_enable_timer_wakeup(POWER_DOWN_PERIOD * 1000000);
+        esp_deep_sleep_start();
       }else{
         watchdog --;
       }
