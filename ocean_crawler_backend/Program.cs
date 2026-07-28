@@ -90,7 +90,7 @@ app.MapPost("/addDiagnostics", (DiagnosticsDto payload, DiagnosticsContext diagn
         {
             var entity = new DiagnosticsHistoryEntity
             {
-                CrawlerId = 1,
+                CrawlerId = crawlerFound!.id,
                 lastLockTimestamp = diag.lastLockTimestamp,
                 averageSatelliteCount = diag.averageSatelliteCount,
                 averageTryCount = diag.averageTryCount,
