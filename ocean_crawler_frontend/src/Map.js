@@ -2,9 +2,10 @@ import React from 'react';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet'
 export function Map({gpsData}) {
 
-let multiPolyline = [[]] 
-multiPolyline[0]=gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]);
 let lastKnownTimestamp = new Date(gpsData['GpsHistory'][0]['timestamp'] * 1000);
+let multiPolyline = [[]] 
+// i can't figure out how to reverse the transparancy to reversing here
+multiPolyline[0]=gpsData['GpsHistory'].reverse().map((x) => [x['longitude'], x['latitude']]); 
 
 const chunkArray = (arr, size) => {
   return arr.reduce((acc, _, i) => {
