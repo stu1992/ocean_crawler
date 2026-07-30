@@ -435,9 +435,9 @@ void loop()
 {
    while (gps.available( gpsPort )){
       while(foundSignal == false && gps.available( gpsPort )){
-        doSomeWork( gps.read() );
         triesThisTime++; //diagnostics
         attempts++; //diagnostics
+        doSomeWork( gps.read() );
       }
       int powerDownPeriod = POWER_DOWN_PERIOD;
       // DEBUG_PORT.print(millis());
