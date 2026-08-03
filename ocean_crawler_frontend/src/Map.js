@@ -1,11 +1,16 @@
 import React from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet'
+import { MapContainer , TileLayer, Polyline, CircleMarker, Popup, useMap  } from 'react-leaflet'
+
+function ChangeView({ center, zoom }) {
+  const map = useMap();
+  map.setView(center, zoom);
+  return null;
+}
+
+
 export function Map({gpsData}) {
 
-let lastKnownTimestamp = new Date(gpsData['GpsHistory'][0]['timestamp'] * 1000);
-let multiPolyline = [[]] 
-// i can't figure out how to reverse the transparancy to reversing here
-multiPolyline[0]=gpsData['GpsHistory'].reverse().map((x) => [x['longitude'], x['latitude']]); 
+let lastKnownTimestamp = new Date(gpsData['GpsHistory'].at(-1)['timestamp'] * 1000);
 
 const chunkArray = (arr, size) => {
   return arr.reduce((acc, _, i) => {
@@ -13,12 +18,14 @@ const chunkArray = (arr, size) => {
       acc.push(arr.slice(i-1, i + size));
     }
     return acc;
-  }, []);
+  });
 };
-let chunks = chunkArray(multiPolyline[0], 2);
-chunks.shift();
+let chunks = chunkArray(gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]).reverse(), 2);
+//chunks.shift();
+
 return(
   <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} scrollWheelZoom={true} tap={false}>
+    <ChangeView center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} /> 
     <TileLayer
       attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -46,8 +46,8 @@ app.MapGet("/locationHistory/{crawlerId}", (int crawlerId, GpsContext gpsContext
     var locations = gpsContext.gps_history
         .Where(u => u.CrawlerId == crawlerId)
         .OrderByDescending(b => b.Timestamp)
-        .OrderBy(x => x.Timestamp)
-        .Take(400);
+        .Take(60)
+        .OrderBy(x => x.Timestamp);
     locations.ToList();
     foreach (var data in locations)
     {
