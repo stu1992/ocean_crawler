@@ -20,8 +20,11 @@ const chunkArray = (arr, size) => {
     return acc;
   });
 };
-let chunks = chunkArray(gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]).reverse(), 2);
-//chunks.shift();
+let chunks = chunkArray(gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]), 2);
+// we have an incomplete tail
+chunks.shift();
+// we want to reverse transparancy tweening
+chunks = chunks.reverse();
 
 return(
   <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} scrollWheelZoom={true} tap={false}>
