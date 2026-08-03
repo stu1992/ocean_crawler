@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapContainer , TileLayer, Polyline, CircleMarker, Popup, useMap  } from 'react-leaflet'
+import { MapContainer , TileLayer, LayersControl, Polyline, CircleMarker, Popup, useMap  } from 'react-leaflet'
 
 function ChangeView({ center, zoom }) {
   const map = useMap();
@@ -25,16 +25,40 @@ chunks.shift();
 chunks.shift();
 // we want to reverse transparancy tweening
 chunks = chunks.reverse();
-
+console.log(chunks);
 return(
   <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} scrollWheelZoom={true} tap={false}>
     <ChangeView center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} /> 
-    <TileLayer
-      attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-    />
+
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Open maps">
+          <TileLayer
+            attribution='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+         />
+        <LayersControl.BaseLayer name="Google Satellite">
+          <TileLayer
+            url="https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+            maxZoom={20}
+            subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+            attribution="&copy; Google Maps"
+          />
+        </LayersControl.BaseLayer>
+       <LayersControl.BaseLayer name="Google Terrain">
+          <TileLayer
+            url="https://{s}.google.com/vt/lyrs=p&x,h&x={x}&y={y}&z={z}"
+            maxZoom={20}
+            subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
+            attribution="&copy; Google Maps"
+          />
+        </LayersControl.BaseLayer>
+
+    </LayersControl.BaseLayer>
+    </LayersControl>
+
     {
-      chunks.filter(x => (x[0][1]>0 && x[1][1]>0 && x[2][1]>0) || (x[0][1]<0 && x[1][1]<0 && x[2][1]<0)).map((chunk, index) => ( 
+      // the 100 calculation is a lngitude, either 170+ degrees or -170- degrees, i want to filter out the extreams going between that limit to the other side
+      chunks.filter(x => !((x[0][1]>100 && x[1][1]<-100) && !(x[0][1]<-100 && x[1][1]>100))).map((chunk, index) => ( 
         <Polyline key={index} pathOptions={{ color: '#000000', opacity: 1.0 -(index * (1 / chunks.length ))  }} positions={chunk}/>
       ))
     }
