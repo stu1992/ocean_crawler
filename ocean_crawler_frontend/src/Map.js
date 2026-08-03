@@ -7,7 +7,6 @@ function ChangeView({ center, zoom }) {
   return null;
 }
 
-
 export function Map({gpsData}) {
 
 let lastKnownTimestamp = new Date(gpsData['GpsHistory'].at(-1)['timestamp'] * 1000);
@@ -23,6 +22,7 @@ const chunkArray = (arr, size) => {
 let chunks = chunkArray(gpsData['GpsHistory'].map((x) => [x['longitude'], x['latitude']]), 2);
 // we have an incomplete tail
 chunks.shift();
+chunks.shift();
 // we want to reverse transparancy tweening
 chunks = chunks.reverse();
 
@@ -34,7 +34,7 @@ return(
       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
     />
     {
-      chunks.map((chunk, index) => ( 
+      chunks.filter(x => (x[0][1]>0 && x[1][1]>0 && x[2][1]>0) || (x[0][1]<0 && x[1][1]<0 && x[2][1]<0)).map((chunk, index) => ( 
         <Polyline key={index} pathOptions={{ color: '#000000', opacity: 1.0 -(index * (1 / chunks.length ))  }} positions={chunk}/>
       ))
     }
