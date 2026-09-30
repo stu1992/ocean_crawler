@@ -67,16 +67,17 @@ const int WATCHDOG_WIFI = 15;
 const int REST_PAYLOAD_SIZE = 10;
 int watchdog = WATCHDOG_RESET;
 bool foundSignal = false;
-const unsigned long POWER_DOWN_PERIOD = 1200; // seconds
-const unsigned long DIAGNOSTIC_PERIOD = 1000 * 60; // milliseconds
+const unsigned long POWER_DOWN_PERIOD = 2*60; // seconds
+const unsigned long DIAGNOSTIC_PERIOD = 600000; // milliseconds
 const int GPS_POWER = 22;
+const int DIAGNOSTICS_OVERRIDE = 15;
 const int SdchipSelect = 4;
 bool networkUp = true;
 RTC_DATA_ATTR unsigned long lastDiagnosticMessage = 0;
 RTC_DATA_ATTR unsigned long millisTracked = 0;
 RTC_DATA_ATTR unsigned long wokeUp = 0;
 
-// diagnostics
+// diagnostics 
 
 RTC_DATA_ATTR  uint32_t lastLockTimestamp = 0; // if we buffer diagnostics
 // retries
@@ -380,6 +381,11 @@ static void GPSloop()
 
 void setup()
 {
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+  pinMode(GPS_POWER, OUTPUT);
+  digitalWrite(GPS_POWER, HIGH);
+  pinMode(DIAGNOSTICS_OVERRIDE, INPUT);
   DEBUG_PORT.begin(115200);
   while (!DEBUG_PORT)
     ;
@@ -448,7 +454,7 @@ void loop()
         DEBUG_PORT.println(lastDiagnosticMessage);
         DEBUG_PORT.println(millisTracked);
         millisTracked+= millis();
-        if(millisTracked > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0){
+        if((millisTracked > lastDiagnosticMessage + DIAGNOSTIC_PERIOD && successfulLocks > 0 && locks > 0) || digitalRead(DIAGNOSTICS_OVERRIDE) == HIGH){
           diagnostics();
           lastDiagnosticMessage = millisTracked;
           clearReadingsBuffer();
