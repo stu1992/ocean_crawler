@@ -263,14 +263,14 @@ void clearReadingsBuffer(){
     }
     http.end();
     delay(1000);
-    }
+  }
   if(everythingWorked){
     SD.remove(readingsFile);
     SD.remove(diagnosticsFile);
   }
+  }
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
-  }
 }
 
 void diagnostics()
