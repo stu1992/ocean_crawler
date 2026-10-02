@@ -25,6 +25,8 @@ chunks.shift();
 chunks.shift();
 // we want to reverse transparancy tweening
 chunks = chunks.reverse();
+chunks = chunks.filter(x => (x[1][1] * x[2][1] >0 && x[1][1] * x[2][1] <25000) || (x[1][1] * x[2][1] <0 && x[1][1] * x[2][1] >-50));
+
 console.log(chunks);
 return(
   <MapContainer center={[gpsData['currentLatitude'],gpsData['currentLongitude']]} zoom={9} scrollWheelZoom={true} tap={false}>
@@ -58,7 +60,7 @@ return(
 
     {
       // the 100 calculation is a lngitude, either 170+ degrees or -170- degrees, i want to filter out the extreams going between that limit to the other side
-      chunks.filter(x => !((x[0][1]>100 && x[1][1]<-100) && !(x[0][1]<-100 && x[1][1]>100))).map((chunk, index) => ( 
+      chunks.map((chunk, index) => ( 
         <Polyline key={index} pathOptions={{ color: '#000000', opacity: 1.0 -(index * (1 / chunks.length ))  }} positions={chunk}/>
       ))
     }
